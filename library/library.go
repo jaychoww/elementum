@@ -306,7 +306,7 @@ func Init() {
 				go Refresh()
 			}
 		case <-updateTicker.C:
-			if config.Get().UpdateFrequency > 0 && config.Get().LibraryEnabled && config.Get().LibrarySyncEnabled && (config.Get().LibrarySyncPlaybackEnabled) {
+			if config.Get().UpdateFrequency > 0 && config.Get().LibraryEnabled && config.Get().LibrarySyncEnabled && config.Get().LibrarySyncPlaybackEnabled {
 				PlanKodiShowsUpdate()
 			}
 		case <-traktSyncTicker.C:

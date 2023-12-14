@@ -308,18 +308,35 @@ func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Sea
 
 // GetEpisodeSearchObject ...
 func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.Episode) *EpisodeSearchObject {
+	seasonCurrent := show.GetSeasonByRealNumber(episode.SeasonNumber)
+	seasonFirst := show.GetSeasonByRealNumber(1)
+
+	seasonYear := 0
+	showYear := 0
+
 	year, _ := strconv.Atoi(strings.Split(episode.AirDate, "-")[0])
-	seasonYear, _ := strconv.Atoi(strings.Split(show.GetSeasonByRealNumber(episode.SeasonNumber).AirDate, "-")[0])
-	showYear, _ := strconv.Atoi(strings.Split(show.GetSeasonByRealNumber(1).AirDate, "-")[0])
+
+	if seasonCurrent != nil {
+		seasonYear, _ = strconv.Atoi(strings.Split(seasonCurrent.AirDate, "-")[0])
+	}
+	if seasonFirst != nil {
+		showYear, _ = strconv.Atoi(strings.Split(seasonFirst.AirDate, "-")[0])
+	}
+
 	title := show.Name
 	if config.Get().UseOriginalTitle && show.OriginalName != "" {
 		title = show.OriginalName
 	}
 
+	seasonName := ""
+	if s := show.GetSeasonByRealNumber(episode.SeasonNumber); s != nil {
+		seasonName = s.Name
+	}
+
 	tvdbID := util.StrInterfaceToInt(show.ExternalIDs.TVDBID)
 
-	//Some Torrents use absolute episodes range in name.
-	//Provider can use Absolute number to filter such.
+	// Some Torrents use absolute episodes range in name.
+	// Provider can use Absolute number to filter such.
 	absoluteNumber := 0
 	episodesTillSeason := show.EpisodesTillSeason(episode.SeasonNumber)
 	if episodesTillSeason > 0 && episodesTillSeason < episode.EpisodeNumber {
@@ -343,7 +360,7 @@ func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.E
 		Title:          NormalizeTitle(title),
 		Titles:         map[string]string{"original": NormalizeTitle(show.OriginalName), "source": show.OriginalName},
 		Season:         episode.SeasonNumber,
-		SeasonName:     show.GetSeasonByRealNumber(episode.SeasonNumber).Name,
+		SeasonName:     seasonName,
 		Episode:        episode.EpisodeNumber,
 		Year:           year,
 		SeasonYear:     seasonYear,

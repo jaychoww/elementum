@@ -698,14 +698,14 @@ func (show *Show) EpisodesTillSeason(season int) int {
 
 	ret := 0
 	for _, s := range show.Seasons {
-		if s.Season > 0 && s.Season < season {
+		if s != nil && s.Season > 0 && s.Season < season {
 			ret += s.EpisodeCount
 		}
 	}
 	return ret
 }
 
-// GetSeasonByRealNumber returns season obj corresponding to real season number.
+// GetSeasonByRealNumber returns season object corresponding to real season number.
 func (show *Show) GetSeasonByRealNumber(season int) *Season {
 	if len(show.Seasons) <= 0 {
 		return nil

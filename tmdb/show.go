@@ -508,14 +508,14 @@ func (show *Show) IsAnime() bool {
 func (show *Show) ShowInfo(episode *Episode) (an int, st string) {
 	tvdbID := util.StrInterfaceToInt(show.ExternalIDs.TVDBID)
 	if tvdbShow, err := tvdb.GetShow(tvdbID, config.Get().Language); err == nil {
-		return show.ShowInfoWithShow(episode, tvdbShow)
+		return show.ShowInfoWithTVDBShow(episode, tvdbShow)
 	}
 
 	return
 }
 
-// ShowInfoWithShow ...
-func (show *Show) ShowInfoWithShow(episode *Episode, tvdbShow *tvdb.Show) (an int, st string) {
+// ShowInfoWithTVDBShow ...
+func (show *Show) ShowInfoWithTVDBShow(episode *Episode, tvdbShow *tvdb.Show) (an int, st string) {
 	if tvdbShow != nil && episode.SeasonNumber > 0 && len(tvdbShow.Seasons) >= episode.SeasonNumber {
 		if tvdbSeason := tvdbShow.GetSeason(episode.SeasonNumber); tvdbSeason != nil && len(tvdbSeason.Episodes) >= episode.EpisodeNumber {
 			if tvdbEpisode := tvdbSeason.GetEpisode(episode.EpisodeNumber); tvdbEpisode != nil && tvdbEpisode.AbsoluteNumber > 0 {

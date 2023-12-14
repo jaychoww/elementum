@@ -771,7 +771,6 @@ func TraktProgressShows(ctx *gin.Context) {
 
 func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page int) {
 	hasNextPage := 0
-	log.Debugf("Render start %d --- %d --- %d", len(shows), total, page)
 	if page > 0 {
 		resultsPerPage := config.Get().ResultsPerPage
 
@@ -787,7 +786,6 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 		if len(shows) > resultsPerPage {
 			start := (page - 1) * resultsPerPage
 			end := start + resultsPerPage
-			log.Debugf("Render mid %d --- %d --- %d -- %d -- %d", len(shows), total, page, start, end)
 			if len(shows) <= end {
 				shows = shows[start:]
 			} else {
