@@ -56,6 +56,7 @@ func setFanart(movie *Movie) *Movie {
 		for _, image := range tmdbImages.Posters {
 			if image.Iso639_1 == config.Get().Language {
 				posterImage = tmdb.ImageURL(image.FilePath, "w1280")
+				break
 			}
 		}
 		movie.Images.Poster.Full = posterImage
@@ -66,6 +67,7 @@ func setFanart(movie *Movie) *Movie {
 		for _, image := range tmdbImages.Backdrops {
 			if image.Iso639_1 == config.Get().Language {
 				backdropImage = tmdb.ImageURL(image.FilePath, "w1280")
+				break
 			}
 		}
 		movie.Images.FanArt.Full = backdropImage
