@@ -1845,7 +1845,7 @@ func (t *Torrent) SelectDownloadFiles(btp *Player) {
 			if season == nil || season.EpisodeCount == 0 || season.Season != btp.p.Season {
 				continue
 			}
-			tmdbSeason := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language, len(show.Seasons))
+			tmdbSeason := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language, len(show.Seasons), false)
 			if tmdbSeason == nil {
 				continue
 			}
@@ -1911,7 +1911,7 @@ func (t *Torrent) ChooseFile(btp *Player) (*File, int, error) {
 			}
 
 			if s := tmdb.GetShow(btp.p.ShowID, config.Get().Language); s != nil && s.IsAnime() {
-				season := tmdb.GetSeason(btp.p.ShowID, btp.p.Season, config.Get().Language, len(s.Seasons))
+				season := tmdb.GetSeason(btp.p.ShowID, btp.p.Season, config.Get().Language, len(s.Seasons), false)
 				if season != nil && season.HasEpisode(btp.p.Episode) {
 					an, _ := s.ShowInfo(season.GetEpisode(btp.p.Episode))
 					if an != 0 {

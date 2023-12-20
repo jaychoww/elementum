@@ -598,7 +598,7 @@ func ShowEpisodes(ctx *gin.Context) {
 
 	episodes := make(xbmc.ListItems, 0)
 	for _, seasonNumber := range seasonsToShow {
-		season := tmdb.GetSeason(showID, seasonNumber, language, len(show.Seasons))
+		season := tmdb.GetSeason(showID, seasonNumber, language, len(show.Seasons), true)
 		if season == nil {
 			ctx.Error(errors.New("Unable to find season"))
 			return
@@ -659,7 +659,7 @@ func showSeasonLinks(xbmcHost *xbmc.XBMCHost, callbackHost string, showID int, s
 		return nil, errors.New("Unable to find show")
 	}
 
-	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons), true)
 	if season == nil {
 		return nil, errors.New("Unable to find season")
 	}
@@ -713,7 +713,7 @@ func ShowSeasonLinks(action string, s *bittorrent.Service) gin.HandlerFunc {
 			return
 		}
 
-		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
+		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons), true)
 		if season == nil {
 			ctx.Error(errors.New("Unable to find season"))
 			return
@@ -859,7 +859,7 @@ func showEpisodeLinks(xbmcHost *xbmc.XBMCHost, callbackHost string, showID int, 
 		return nil, errors.New("Unable to find show")
 	}
 
-	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons), true)
 	if season == nil {
 		return nil, errors.New("Unable to find season")
 	}

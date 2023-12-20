@@ -36,7 +36,7 @@ const (
 	TMDBMoviesTopMoviesExpire      = 24 * time.Hour
 	TMDBMoviesTopMoviesTotalKey    = TMDBKey + "topmovies.%s.%s.%s.%s.total"
 	TMDBMoviesTopMoviesTotalExpire = 24 * time.Hour
-	TMDBSeasonKey                  = TMDBKey + "season.%d.%d.%s"
+	TMDBSeasonKey                  = TMDBKey + "season.%d.%d.%s.%t"
 	TMDBSeasonExpire               = GeneralExpire
 	TMDBSeasonImagesKey            = TMDBKey + "show.%d.%d.images"
 	TMDBSeasonImagesExpire         = GeneralExpire

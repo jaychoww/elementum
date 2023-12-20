@@ -390,7 +390,7 @@ const (
 	tmdbEndpoint  = "https://api.themoviedb.org/3"
 	imageEndpoint = "https://image.tmdb.org/t/p/"
 	burstRate     = 150
-	burstTime     = 10 * time.Second
+	burstTime     = 5 * time.Second
 	// Currently TMDB is disabled rates limiting
 	// burstRate               = 40
 	// burstTime               = 10 * time.Second
@@ -727,9 +727,16 @@ func (show *Show) CountRealSeasons() int {
 
 	ret := 0
 	for _, s := range show.Seasons {
-		if s.Season > 0 {
-			ret++
+		if !config.Get().ShowUnairedSeasons {
+			if _, isExpired := util.AirDateWithExpireCheck(s.AirDate, config.Get().ShowEpisodesOnReleaseDay); isExpired {
+				continue
+			}
 		}
+		if !config.Get().ShowSeasonsSpecials && s.Season <= 0 {
+			continue
+		}
+
+		ret++
 	}
 	return ret
 }

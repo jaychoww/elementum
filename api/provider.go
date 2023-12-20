@@ -57,7 +57,7 @@ func ProviderGetEpisode(ctx *gin.Context) {
 	log.Infof("Searching links for TMDB Id:", showID)
 
 	show := tmdb.GetShow(showID, config.Get().Language)
-	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons), true)
 	if season == nil {
 		ctx.Error(fmt.Errorf("Unable to get season %d", seasonNumber))
 		return

@@ -20,7 +20,7 @@ import (
 )
 
 // GetSeason ...
-func GetSeason(showID int, seasonNumber int, language string, seasonsCount int) *Season {
+func GetSeason(showID int, seasonNumber int, language string, seasonsCount int, includeEpisodes bool) *Season {
 	defer perf.ScopeTimer()()
 
 	var season *Season
@@ -36,7 +36,16 @@ func GetSeason(showID int, seasonNumber int, language string, seasonsCount int) 
 		updateFrequency = 1440
 	}
 
-	key := fmt.Sprintf(cache.TMDBSeasonKey, showID, seasonNumber, language)
+	key := fmt.Sprintf(cache.TMDBSeasonKey, showID, seasonNumber, language, includeEpisodes)
+
+	// If there is already a season with included episodes - we can use it
+	if !includeEpisodes {
+		keyFull := fmt.Sprintf(cache.TMDBSeasonKey, showID, seasonNumber, language, true)
+		if err := cacheStore.Get(keyFull, &season); err == nil && season != nil {
+			return season
+		}
+	}
+
 	if err := cacheStore.Get(key, &season); err != nil {
 		err = MakeRequest(APIRequest{
 			URL: fmt.Sprintf("%s/tv/%d/season/%d", tmdbEndpoint, showID, seasonNumber),
@@ -65,7 +74,7 @@ func GetSeason(showID int, seasonNumber int, language string, seasonsCount int) 
 		// We detect if episodes have their name filled, and if not re-query
 		// with no language set.
 		// See https://github.com/scakemyer/plugin.video.quasar/issues/249
-		if season.EpisodeCount > 0 {
+		if season.EpisodeCount > 0 && includeEpisodes {
 			// If we have empty Names/Overviews then we need to collect Translations separately
 			wg := sync.WaitGroup{}
 			for i, episode := range season.Episodes {
@@ -106,11 +115,11 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 	// If we have empty Names/Overviews then we need to collect Translations separately
 	wg := sync.WaitGroup{}
 	for i, season := range seasons {
-		if season.Translations == nil && (season.Name == "" || season.Overview == "") {
+		if season.Translations == nil && (season.Name == "" || season.Overview == "" || len(season.Episodes) == 0) {
 			wg.Add(1)
 			go func(idx int, season *Season) {
 				defer wg.Done()
-				seasons[idx] = GetSeason(show.ID, season.Season, config.Get().Language, len(seasons))
+				seasons[idx] = GetSeason(show.ID, season.Season, config.Get().Language, len(seasons), false)
 			}(i, season)
 		}
 	}
@@ -160,6 +169,8 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 		name = "Specials"
 	}
 
+	season.EpisodeCount = season.countEpisodesNumber(show)
+
 	item := &xbmc.ListItem{
 		Label: name,
 		Info: &xbmc.ListItemInfo{
@@ -201,7 +212,7 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 	}
 
 	if config.Get().ShowUnwatchedEpisodesNumber {
-		watchedEpisodes := season.watchedEpisodesNumber(show)
+		watchedEpisodes := season.countWatchedEpisodesNumber(show)
 		item.Properties.WatchedEpisodes = strconv.Itoa(watchedEpisodes)
 		item.Properties.UnWatchedEpisodes = strconv.Itoa(season.EpisodeCount - watchedEpisodes)
 	}
@@ -297,8 +308,8 @@ func (season *Season) findTranslation(language string) *Translation {
 	return nil
 }
 
-// watchedEpisodesNumber returns number of watched episodes
-func (season *Season) watchedEpisodesNumber(show *Show) int {
+// countWatchedEpisodesNumber returns number of watched episodes
+func (season *Season) countWatchedEpisodesNumber(show *Show) int {
 	if show == nil {
 		return 0
 	}
@@ -321,10 +332,35 @@ func (season *Season) watchedEpisodesNumber(show *Show) int {
 				}
 			}
 
-			if playcount.GetWatchedEpisodeByTMDB(show.ID, season.Season, episode.EpisodeNumber) {
+			if playcount.GetWatchedEpisodeByTMDB(show.ID, episode.SeasonNumber, episode.EpisodeNumber) {
 				watchedEpisodes++
 			}
 		}
 	}
 	return watchedEpisodes
+}
+
+// countEpisodesNumber returns number of episodes
+func (season *Season) countEpisodesNumber(show *Show) (episodes int) {
+	if show == nil || season.Episodes == nil {
+		return season.EpisodeCount
+	}
+
+	c := config.Get()
+
+	for _, episode := range season.Episodes {
+		if episode == nil {
+			continue
+		} else if !c.ShowUnairedEpisodes {
+			if episode.AirDate == "" {
+				continue
+			}
+			if _, isExpired := util.AirDateWithExpireCheck(episode.AirDate, c.ShowEpisodesOnReleaseDay); isExpired {
+				continue
+			}
+		}
+
+		episodes++
+	}
+	return
 }

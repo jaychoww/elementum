@@ -944,7 +944,7 @@ func (btp *Player) smartMatch(choices []*CandidateFile) {
 		if season == nil || season.EpisodeCount == 0 {
 			continue
 		}
-		tmdbSeason := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language, len(show.Seasons))
+		tmdbSeason := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language, len(show.Seasons), true)
 		if tmdbSeason == nil {
 			continue
 		}
@@ -1429,7 +1429,7 @@ func getShowSeasonEpisode(showID, seasonNumber, episodeNumber int) (*tmdb.Show, 
 		return nil, nil, nil, errors.New("Unable to find show")
 	}
 
-	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons), true)
 	if season == nil {
 		return nil, nil, nil, errors.New("Unable to find season")
 	}
@@ -1447,7 +1447,7 @@ func getNextShowSeasonEpisode(showID, seasonNumber, episodeNumber int) (*tmdb.Sh
 		return nil, nil, nil, errors.New("Unable to find show")
 	}
 
-	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons), true)
 	if season == nil {
 		return nil, nil, nil, errors.New("Unable to find season")
 	}

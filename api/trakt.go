@@ -1413,7 +1413,7 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 				if show != nil {
 					seasonsCount = len(show.Seasons)
 				}
-				season = tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language, seasonsCount)
+				season = tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language, seasonsCount, false)
 				episode = tmdb.GetEpisode(showListing.Show.IDs.TMDB, epi.Season, epi.Number, language)
 
 				if episode != nil {
@@ -1573,7 +1573,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 			if !config.Get().ForceUseTrakt && showListing.Show.IDs.TMDB != 0 {
 				show = tmdb.GetShow(showListing.Show.IDs.TMDB, language)
 				if show != nil {
-					season = tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language, len(show.Seasons))
+					season = tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language, len(show.Seasons), false)
 					episode = tmdb.GetEpisode(showListing.Show.IDs.TMDB, epi.Season, epi.Number, language)
 				}
 

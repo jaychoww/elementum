@@ -542,6 +542,12 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 		name = show.OriginalName
 	}
 
+	if config.Get().ShowUnwatchedEpisodesNumber {
+		// Get all seasons information for this show, it is required to get Air dates
+		show.GetSeasons()
+		show.NumberOfEpisodes = show.countEpisodesNumber()
+	}
+
 	item := &xbmc.ListItem{
 		Label: name,
 		Info: &xbmc.ListItemInfo{
@@ -586,7 +592,7 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 	}
 
 	if config.Get().ShowUnwatchedEpisodesNumber {
-		watchedEpisodes := show.watchedEpisodesNumber()
+		watchedEpisodes := show.countWatchedEpisodesNumber()
 		item.Properties.WatchedEpisodes = strconv.Itoa(watchedEpisodes)
 		item.Properties.UnWatchedEpisodes = strconv.Itoa(show.NumberOfEpisodes - watchedEpisodes)
 	}
@@ -717,23 +723,46 @@ func (show *Show) findTranslation(language string) *Translation {
 	return nil
 }
 
-// watchedEpisodesNumber returns number of watched episodes
-func (show *Show) watchedEpisodesNumber() int {
+// countWatchedEpisodesNumber returns number of watched episodes
+func (show *Show) countWatchedEpisodesNumber() int {
 	watchedEpisodes := 0
 	if playcount.GetWatchedShowByTMDB(show.ID) {
 		watchedEpisodes = show.NumberOfEpisodes
 	} else {
+		if show.Seasons == nil {
+			return 0
+		}
+
 		for _, season := range show.Seasons {
-			if playcount.GetWatchedSeasonByTMDB(show.ID, season.Season) {
-				watchedEpisodes += season.EpisodeCount
-			} else {
-				for _, episode := range season.Episodes {
-					if playcount.GetWatchedEpisodeByTMDB(show.ID, season.Season, episode.EpisodeNumber) {
-						watchedEpisodes++
-					}
-				}
-			}
+			watchedEpisodes += season.countWatchedEpisodesNumber(show)
 		}
 	}
 	return watchedEpisodes
+}
+
+// countEpisodesNumber returns number of episodes taking into account unaired and special
+func (show *Show) countEpisodesNumber() (episodes int) {
+	if show.Seasons == nil {
+		return
+	}
+
+	for _, season := range show.Seasons {
+		episodes += season.countEpisodesNumber(show)
+	}
+
+	return
+}
+
+func (show *Show) GetSeasons() {
+	wg := sync.WaitGroup{}
+	for i, season := range show.Seasons {
+		if season.Translations == nil && (season.Name == "" || season.Overview == "" || len(season.Episodes) == 0) {
+			wg.Add(1)
+			go func(idx int, season *Season) {
+				defer wg.Done()
+				show.Seasons[idx] = GetSeason(show.ID, season.Season, config.Get().Language, len(show.Seasons), false)
+			}(i, season)
+		}
+	}
+	wg.Wait()
 }

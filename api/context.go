@@ -158,7 +158,7 @@ func ContextAssignTMDBSelector(s *bittorrent.Service, media string) gin.HandlerF
 			seasonNumber, _ := strconv.Atoi(seasonN)
 
 			if showID != 0 && seasonNumber != 0 {
-				season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, 0)
+				season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, 0, false)
 				if season == nil {
 					err = errors.New("Unable to find season")
 				} else {

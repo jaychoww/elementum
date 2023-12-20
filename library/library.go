@@ -584,7 +584,7 @@ func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
 			continue
 		}
 
-		seasonTMDB := tmdb.GetSeason(showID, season.Season, config.Get().Language, len(show.Seasons))
+		seasonTMDB := tmdb.GetSeason(showID, season.Season, config.Get().Language, len(show.Seasons), true)
 		if seasonTMDB == nil {
 			continue
 		}
