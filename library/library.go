@@ -909,7 +909,7 @@ func wasRemoved(id int, mediaType int) (wasRemoved bool) {
 	return false
 }
 
-// IsInLibrary checks for LibraryItem in Emenentum database
+// IsInLibrary checks for LibraryItem in Elementum database
 func IsInLibrary(id int, mediaType int) (res bool) {
 	defer perf.ScopeTimer()()
 
@@ -1387,11 +1387,21 @@ func getShowPath(show *tmdb.Show) (showPath, showStrm string) {
 }
 
 func getMoviePathsByTMDB(id int) (ret map[string]bool) {
+	xbmcHost, err := xbmc.GetLocalXBMCHost()
+	canResolveSpecialPath := true
+	if xbmcHost == nil || err != nil {
+		canResolveSpecialPath = false
+	}
+
 	ret = map[string]bool{}
 
 	if m, err := uid.GetMovieByTMDB(id); err == nil {
 		if m != nil && m.File != "" && !util.IsNetworkPath(m.File) && strings.HasSuffix(m.File, ".strm") {
-			ret[filepath.Dir(m.File)] = true
+			filePath := m.File
+			if strings.HasPrefix(filePath, "special:") && canResolveSpecialPath {
+				filePath = xbmcHost.TranslatePath(filePath)
+			}
+			ret[filepath.Dir(filePath)] = true
 		}
 	}
 
@@ -1399,12 +1409,22 @@ func getMoviePathsByTMDB(id int) (ret map[string]bool) {
 }
 
 func getShowPathsByTMDB(id int) (ret map[string]bool) {
+	xbmcHost, err := xbmc.GetLocalXBMCHost()
+	canResolveSpecialPath := true
+	if xbmcHost == nil || err != nil {
+		canResolveSpecialPath = false
+	}
+
 	ret = map[string]bool{}
 
 	if s, err := uid.FindShowByTMDB(id); err == nil {
 		for _, e := range s.Episodes {
 			if e != nil && e.File != "" && !util.IsNetworkPath(e.File) && strings.HasSuffix(e.File, ".strm") {
-				ret[filepath.Dir(e.File)] = true
+				filePath := e.File
+				if strings.HasPrefix(filePath, "special:") && canResolveSpecialPath {
+					filePath = xbmcHost.TranslatePath(filePath)
+				}
+				ret[filepath.Dir(filePath)] = true
 			}
 		}
 	}
