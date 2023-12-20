@@ -1401,7 +1401,9 @@ func getMoviePathsByTMDB(id int) (ret map[string]bool) {
 			if strings.HasPrefix(filePath, "special:") && canResolveSpecialPath {
 				filePath = xbmcHost.TranslatePath(filePath)
 			}
-			ret[filepath.Dir(filePath)] = true
+			if util.IsValidPath(filePath) {
+				ret[filepath.Dir(filePath)] = true
+			}
 		}
 	}
 
@@ -1424,7 +1426,9 @@ func getShowPathsByTMDB(id int) (ret map[string]bool) {
 				if strings.HasPrefix(filePath, "special:") && canResolveSpecialPath {
 					filePath = xbmcHost.TranslatePath(filePath)
 				}
-				ret[filepath.Dir(filePath)] = true
+				if util.IsValidPath(filePath) {
+					ret[filepath.Dir(filePath)] = true
+				}
 			}
 		}
 	}

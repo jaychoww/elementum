@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -204,4 +205,16 @@ func IsWritablePath(path string) error {
 
 func IsNetworkPath(path string) bool {
 	return strings.HasPrefix(path, "nfs") || strings.HasPrefix(path, "smb")
+}
+
+func IsValidPath(path string) bool {
+	if IsNetworkPath(path) {
+		return false
+	}
+
+	if runtime.GOOS != "windows" && strings.Contains(path, ":\\") {
+		return false
+	}
+
+	return true
 }
