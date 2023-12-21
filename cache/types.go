@@ -94,7 +94,7 @@ const (
 	TraktShowsCollectionKey                = TraktKey + "shows.collection"
 	TraktShowsCollectionExpire             = GeneralExpire
 	TraktShowsListKey                      = TraktKey + "shows.list.%s"
-	TraktShowsListExpire                   = 1 * time.Minute
+	TraktShowsListExpire                   = GeneralExpire
 	TraktShowsCalendarKey                  = TraktKey + "shows.calendar.%s.%s.%d"
 	TraktShowsCalendarExpire               = GeneralExpire
 	TraktShowsCalendarTotalKey             = TraktKey + "shows.calendar.%s.total"
