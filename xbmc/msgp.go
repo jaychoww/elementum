@@ -1969,9 +1969,9 @@ func (z *ListItemInfo) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *ListItemProperties) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 7
+	// map header, size 8
 	// string "TotalSeasons"
-	o = append(o, 0x87, 0xac, 0x54, 0x6f, 0x74, 0x61, 0x6c, 0x53, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x73)
+	o = append(o, 0x88, 0xac, 0x54, 0x6f, 0x74, 0x61, 0x6c, 0x53, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x73)
 	o = msgp.AppendString(o, z.TotalSeasons)
 	// string "TotalEpisodes"
 	o = append(o, 0xad, 0x54, 0x6f, 0x74, 0x61, 0x6c, 0x45, 0x70, 0x69, 0x73, 0x6f, 0x64, 0x65, 0x73)
@@ -1991,6 +1991,9 @@ func (z *ListItemProperties) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "ShowTMDBId"
 	o = append(o, 0xaa, 0x53, 0x68, 0x6f, 0x77, 0x54, 0x4d, 0x44, 0x42, 0x49, 0x64)
 	o = msgp.AppendString(o, z.ShowTMDBId)
+	// string "SpecialSort"
+	o = append(o, 0xab, 0x53, 0x70, 0x65, 0x63, 0x69, 0x61, 0x6c, 0x53, 0x6f, 0x72, 0x74)
+	o = msgp.AppendString(o, z.SpecialSort)
 	return
 }
 
@@ -2054,6 +2057,12 @@ func (z *ListItemProperties) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				err = msgp.WrapError(err, "ShowTMDBId")
 				return
 			}
+		case "SpecialSort":
+			z.SpecialSort, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "SpecialSort")
+				return
+			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -2068,7 +2077,7 @@ func (z *ListItemProperties) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *ListItemProperties) Msgsize() (s int) {
-	s = 1 + 13 + msgp.StringPrefixSize + len(z.TotalSeasons) + 14 + msgp.StringPrefixSize + len(z.TotalEpisodes) + 16 + msgp.StringPrefixSize + len(z.WatchedEpisodes) + 18 + msgp.StringPrefixSize + len(z.UnWatchedEpisodes) + 14 + msgp.StringPrefixSize + len(z.SubtitlesSync) + 25 + msgp.StringPrefixSize + len(z.SubtitlesHearingImpaired) + 11 + msgp.StringPrefixSize + len(z.ShowTMDBId)
+	s = 1 + 13 + msgp.StringPrefixSize + len(z.TotalSeasons) + 14 + msgp.StringPrefixSize + len(z.TotalEpisodes) + 16 + msgp.StringPrefixSize + len(z.WatchedEpisodes) + 18 + msgp.StringPrefixSize + len(z.UnWatchedEpisodes) + 14 + msgp.StringPrefixSize + len(z.SubtitlesSync) + 25 + msgp.StringPrefixSize + len(z.SubtitlesHearingImpaired) + 11 + msgp.StringPrefixSize + len(z.ShowTMDBId) + 12 + msgp.StringPrefixSize + len(z.SpecialSort)
 	return
 }
 
@@ -4231,5 +4240,57 @@ func (z *View) Msgsize() (s int) {
 			s += z.Items[za0001].Msgsize()
 		}
 	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z XBMCHost) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 1
+	// string "Host"
+	o = append(o, 0x81, 0xa4, 0x48, 0x6f, 0x73, 0x74)
+	o = msgp.AppendString(o, z.Host)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *XBMCHost) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Host":
+			z.Host, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Host")
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z XBMCHost) Msgsize() (s int) {
+	s = 1 + 5 + msgp.StringPrefixSize + len(z.Host)
 	return
 }

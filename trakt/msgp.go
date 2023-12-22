@@ -4228,9 +4228,9 @@ func (z *ProgressShow) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *Season) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 10
+	// map header, size 11
 	// string "Number"
-	o = append(o, 0x8a, 0xa6, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72)
+	o = append(o, 0x8b, 0xa6, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72)
 	o = msgp.AppendInt(o, z.Number)
 	// string "Overview"
 	o = append(o, 0xa8, 0x4f, 0x76, 0x65, 0x72, 0x76, 0x69, 0x65, 0x77)
@@ -4241,6 +4241,9 @@ func (z *Season) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "AiredEpisodes"
 	o = append(o, 0xad, 0x41, 0x69, 0x72, 0x65, 0x64, 0x45, 0x70, 0x69, 0x73, 0x6f, 0x64, 0x65, 0x73)
 	o = msgp.AppendInt(o, z.AiredEpisodes)
+	// string "FirstAired"
+	o = append(o, 0xaa, 0x46, 0x69, 0x72, 0x73, 0x74, 0x41, 0x69, 0x72, 0x65, 0x64)
+	o = msgp.AppendString(o, z.FirstAired)
 	// string "Rating"
 	o = append(o, 0xa6, 0x52, 0x61, 0x74, 0x69, 0x6e, 0x67)
 	o = msgp.AppendFloat32(o, z.Rating)
@@ -4329,6 +4332,12 @@ func (z *Season) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			z.AiredEpisodes, bts, err = msgp.ReadIntBytes(bts)
 			if err != nil {
 				err = msgp.WrapError(err, "AiredEpisodes")
+				return
+			}
+		case "FirstAired":
+			z.FirstAired, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "FirstAired")
 				return
 			}
 		case "Rating":
@@ -4427,7 +4436,7 @@ func (z *Season) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Season) Msgsize() (s int) {
-	s = 1 + 7 + msgp.IntSize + 9 + msgp.StringPrefixSize + len(z.Overview) + 13 + msgp.IntSize + 14 + msgp.IntSize + 7 + msgp.Float32Size + 6 + msgp.IntSize + 8 + msgp.StringPrefixSize + len(z.Network) + 9 + msgp.ArrayHeaderSize
+	s = 1 + 7 + msgp.IntSize + 9 + msgp.StringPrefixSize + len(z.Overview) + 13 + msgp.IntSize + 14 + msgp.IntSize + 11 + msgp.StringPrefixSize + len(z.FirstAired) + 7 + msgp.Float32Size + 6 + msgp.IntSize + 8 + msgp.StringPrefixSize + len(z.Network) + 9 + msgp.ArrayHeaderSize
 	for za0001 := range z.Episodes {
 		if z.Episodes[za0001] == nil {
 			s += msgp.NilSize
