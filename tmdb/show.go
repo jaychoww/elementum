@@ -730,7 +730,7 @@ func (show *Show) countWatchedEpisodesNumber() (watchedEpisodes int) {
 	} else {
 		for _, season := range show.Seasons {
 			if season == nil {
-				return
+				continue
 			}
 			watchedEpisodes += season.countWatchedEpisodesNumber(show)
 		}
@@ -742,7 +742,7 @@ func (show *Show) countWatchedEpisodesNumber() (watchedEpisodes int) {
 func (show *Show) countEpisodesNumber() (episodes int) {
 	for _, season := range show.Seasons {
 		if season == nil {
-			return
+			continue
 		}
 		episodes += season.countEpisodesNumber(show)
 	}

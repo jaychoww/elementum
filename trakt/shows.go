@@ -1025,7 +1025,7 @@ func (show *Show) ToListItem() (item *xbmc.ListItem) {
 		seasons := GetSeasons(show.IDs.Trakt, false)
 		item.Properties.TotalSeasons = strconv.Itoa(CountRealSeasons(seasons))
 
-		watchedEpisodes := show.watchedEpisodesNumber()
+		watchedEpisodes := show.countWatchedEpisodesNumber()
 		item.Properties.WatchedEpisodes = strconv.Itoa(watchedEpisodes)
 		item.Properties.UnWatchedEpisodes = strconv.Itoa(show.AiredEpisodes - watchedEpisodes)
 	}
@@ -1127,8 +1127,8 @@ func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 	return item
 }
 
-// watchedEpisodesNumber returns number of watched episodes
-func (show *Show) watchedEpisodesNumber() (watchedEpisodes int) {
+// countWatchedEpisodesNumber returns number of watched episodes
+func (show *Show) countWatchedEpisodesNumber() (watchedEpisodes int) {
 	c := config.Get()
 
 	if playcount.GetWatchedShowByTrakt(show.IDs.Trakt) {
