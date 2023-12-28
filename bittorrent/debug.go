@@ -21,7 +21,7 @@ func DebugAll(s *Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		defer perf.ScopeTimer()()
 
-		ctx.Writer.Header().Set("Content-Type", "text/plain")
+		ctx.Writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 		writeHeader(ctx.Writer, "Torrent Client")
 		writeResponse(ctx.Writer, "/info")
