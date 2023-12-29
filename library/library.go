@@ -1008,14 +1008,13 @@ func URLQuery(route string, query ...string) string {
 
 // SyncMoviesList updates trakt movie collections in cache
 func SyncMoviesList(listID string, updating bool, isUpdateNeeded bool) (err error) {
-	if err = checkMoviesPath(); err != nil {
-		return
-	}
-
 	started := time.Now()
 	defer func() {
 		log.Debugf("Trakt sync movies %s finished in %s", listID, time.Since(started))
 	}()
+
+	var addEnabled bool
+	var removeEnabled bool
 
 	var label string
 	var addedMovies []*trakt.Movies
@@ -1029,16 +1028,29 @@ func SyncMoviesList(listID string, updating bool, isUpdateNeeded bool) (err erro
 		current, _ = trakt.WatchlistMovies(isUpdateNeeded)
 
 		label = "LOCALIZE[30254]"
+
+		addEnabled = config.Get().TraktSyncWatchlist
+		removeEnabled = config.Get().TraktSyncRemovedMoviesBack
 	case "collection":
 		previous, _ = trakt.PreviousCollectionMovies()
 		current, _ = trakt.CollectionMovies(isUpdateNeeded)
 
 		label = "LOCALIZE[30257]"
+
+		addEnabled = config.Get().TraktSyncCollections
+		removeEnabled = config.Get().TraktSyncRemovedMoviesBack
 	default:
 		previous, _ = trakt.PreviousListItemsMovies(listID)
 		current, _ = trakt.ListItemsMovies("", listID, isUpdateNeeded)
 
 		label = "LOCALIZE[30263]"
+
+		addEnabled = config.Get().TraktSyncUserlists
+		removeEnabled = config.Get().TraktSyncRemovedMoviesBack
+	}
+
+	if err = checkMoviesPath(); err != nil {
+		return
 	}
 
 	// For first run we will try to write all movies, not only the delta
@@ -1049,13 +1061,28 @@ func SyncMoviesList(listID string, updating bool, isUpdateNeeded bool) (err erro
 		removedMovies = DiffTraktMovies(current, previous, IsTraktInitialized)
 	}
 
-	if err != nil {
-		log.Error(err)
-		return
+	// Syncing movies added to Trakt source
+	if addEnabled && len(addedMovies) > 0 {
+		if err = SyncMoviesListAdded(addedMovies, updating, isUpdateNeeded, label, listID); err != nil {
+			log.Warningf("Could not sync added movies: %s", err)
+		}
 	}
 
+	// Sync back removed Movies, meaning removing them from Kodi library.
+	if removeEnabled && len(removedMovies) > 0 {
+		if err := syncMoviesRemovedBack(removedMovies); err != nil {
+			log.Warningf("Could not sync back removed movies: %s", err)
+		}
+		log.Infof("Movies list (%s) removed %d items", listID, len(removedMovies))
+	}
+
+	return nil
+}
+
+// SyncMoviesListAdded updates added movies
+func SyncMoviesListAdded(movies []*trakt.Movies, updating, isUpdateNeeded bool, label, listID string) (err error) {
 	var movieIDs []int
-	for _, movie := range addedMovies {
+	for _, movie := range movies {
 		title := movie.Movie.Title
 		// Try to resolve TMDB id through IMDB id, if provided
 		if movie.Movie.IDs.TMDB == 0 && len(movie.Movie.IDs.IMDB) > 0 {
@@ -1072,14 +1099,7 @@ func SyncMoviesList(listID string, updating bool, isUpdateNeeded bool) (err erro
 
 		tmdbID := strconv.Itoa(movie.Movie.IDs.TMDB)
 
-		// FIXME: 'updating' is always passed as false, so wasRemoved check is always ignored.
-		// also writeMovieStrm now has wasRemoved check.
-		if updating && wasRemoved(movie.Movie.IDs.TMDB, MovieType) {
-			continue
-		}
-
-		// FIXME: should it be like for shows - 'if !updating && !isUpdateNeeded && IsDuplicateShow(tmdbID) {' ?
-		if uid.IsDuplicateMovie(tmdbID) {
+		if !updating && !isUpdateNeeded && uid.IsDuplicateMovie(tmdbID) {
 			continue
 		}
 
@@ -1094,16 +1114,8 @@ func SyncMoviesList(listID string, updating bool, isUpdateNeeded bool) (err erro
 		return err
 	}
 
-	// Sync back removed Movies, meaning removing them from Kodi library.
-	if config.Get().TraktSyncRemovedMoviesBack && len(removedMovies) != 0 {
-		if err := syncMoviesRemovedBack(removedMovies); err != nil {
-			log.Warningf("Could not sync back removed movies: %s", err)
-		}
-		log.Infof("Movies list (%s) removed %d items", listID, len(removedMovies))
-	}
-
 	if !updating && len(movieIDs) > 0 {
-		log.Infof("Movies list (%s) added %d items", listID, len(addedMovies))
+		log.Infof("Movies list (%s) added %d items", listID, len(movies))
 		xbmcHost, _ := xbmc.GetLocalXBMCHost()
 		if xbmcHost != nil {
 			if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmcHost.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label))) {
@@ -1111,6 +1123,7 @@ func SyncMoviesList(listID string, updating bool, isUpdateNeeded bool) (err erro
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -1120,14 +1133,13 @@ func SyncMoviesList(listID string, updating bool, isUpdateNeeded bool) (err erro
 
 // SyncShowsList updates trakt collections in cache
 func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error) {
-	if err = checkShowsPath(); err != nil {
-		return err
-	}
-
 	started := time.Now()
 	defer func() {
 		log.Debugf("Trakt sync shows %s finished in %s", listID, time.Since(started))
 	}()
+
+	var addEnabled bool
+	var removeEnabled bool
 
 	var label string
 	var addedShows []*trakt.Shows
@@ -1141,16 +1153,29 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 		current, _ = trakt.WatchlistShows(isUpdateNeeded)
 
 		label = "LOCALIZE[30254]"
+
+		addEnabled = config.Get().TraktSyncWatchlist
+		removeEnabled = config.Get().TraktSyncRemovedShowsBack
 	case "collection":
 		previous, _ = trakt.PreviousCollectionShows()
 		current, _ = trakt.CollectionShows(isUpdateNeeded)
 
 		label = "LOCALIZE[30257]"
+
+		addEnabled = config.Get().TraktSyncCollections
+		removeEnabled = config.Get().TraktSyncRemovedShowsBack
 	default:
 		previous, _ = trakt.PreviousListItemsShows(listID)
 		current, _ = trakt.ListItemsShows("", listID, isUpdateNeeded)
 
 		label = "LOCALIZE[30263]"
+
+		addEnabled = config.Get().TraktSyncUserlists
+		removeEnabled = config.Get().TraktSyncRemovedShowsBack
+	}
+
+	if err = checkShowsPath(); err != nil {
+		return err
 	}
 
 	// For first run we will try to write all shows, not only the delta
@@ -1161,11 +1186,26 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 		removedShows = DiffTraktShows(current, previous, IsTraktInitialized)
 	}
 
-	if err != nil {
-		log.Error(err)
-		return
+	// Syncing shows added to Trakt source
+	if addEnabled && len(addedShows) > 0 {
+		if err = SyncShowsListAdded(addedShows, updating, isUpdateNeeded, label, listID); err != nil {
+			log.Warningf("Could not sync added shows: %s", err)
+		}
 	}
 
+	// Sync back removed Shows, meaning removing them from Kodi library.
+	if removeEnabled && len(removedShows) > 0 {
+		if err := syncShowsRemovedBack(removedShows); err != nil {
+			log.Warningf("Could not sync back removed shows: %s", err)
+		}
+		log.Infof("Shows list (%s) removed %d items", listID, len(removedShows))
+	}
+
+	return nil
+}
+
+// SyncShowsListAdded updates added shows
+func SyncShowsListAdded(shows []*trakt.Shows, updating, isUpdateNeeded bool, label, listID string) (err error) {
 	cacheStore := cache.NewDBStore()
 	showsLastUpdates := map[int]time.Time{}
 
@@ -1176,7 +1216,7 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 	}()
 
 	var showIDs []int
-	for _, show := range addedShows {
+	for _, show := range shows {
 		title := show.Show.Title
 		// Try to resolve TMDB id through IMDB id, if provided
 		if show.Show.IDs.TMDB == 0 {
@@ -1220,7 +1260,7 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 	found := false
 	for k := range showsLastUpdates {
 		found = false
-		for _, s := range addedShows {
+		for _, s := range shows {
 			if s.Show.IDs.Trakt == k {
 				found = true
 				break
@@ -1236,14 +1276,6 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 		return err
 	}
 
-	// Sync back removed Shows, meaning removing them from Kodi library.
-	if config.Get().TraktSyncRemovedShowsBack && len(removedShows) != 0 {
-		if err := syncShowsRemovedBack(removedShows); err != nil {
-			log.Warningf("Could not sync back removed shows: %s", err)
-		}
-		log.Infof("Shows list (%s) removed %d items", listID, len(removedShows))
-	}
-
 	if !updating && len(showIDs) > 0 {
 		log.Infof("Shows list (%s) added %d items", listID, len(showIDs))
 		xbmcHost, _ := xbmc.GetLocalXBMCHost()
@@ -1253,6 +1285,7 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 			}
 		}
 	}
+
 	return nil
 }
 
