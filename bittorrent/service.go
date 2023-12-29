@@ -157,8 +157,7 @@ func (s *Service) CloseSession() {
 	}()
 
 	log.Info("Closing Session")
-	// TODO: Do we need to call this?
-	// s.SessionGlobal.Abort()
+	s.SessionGlobal.Abort()
 	if err := lt.DeleteSession(s.SessionGlobal); err != nil {
 		log.Errorf("Could not delete libtorrent session: %s", err)
 	}
@@ -1141,27 +1140,40 @@ func (s *Service) Alerts() (<-chan *Alert, chan<- interface{}) {
 }
 
 func (s *Service) logAlerts() {
+	pc := s.Closer.C()
 	alerts, _ := s.Alerts()
-	for alert := range alerts {
-		// Skipping Tracker communication, Save_Resume, UDP errors
-		// No need to spam logs.
-		if alert.Category&int(lt.SaveResumeDataAlertAlertType) != 0 ||
-			alert.Category&int(lt.UdpErrorAlertAlertType) != 0 ||
-			alert.Category&int(lt.AlertBlockProgressNotification) != 0 ||
-			alert.Category&int(lt.TrackerReplyAlertAlertType) != 0 ||
-			alert.Category&int(lt.DhtReplyAlertAlertType) != 0 ||
-			alert.Category&int(lt.StateChangedAlertAlertType) != 0 ||
-			alert.Category&int(lt.TorrentFinishedAlertAlertType) != 0 ||
-			alert.Category&int(lt.DhtLogAlertStaticCategory) != 0 {
-			continue
-		} else if alert.Category&int(lt.AlertErrorNotification) != 0 {
-			log.Errorf("%s: %s", alert.What, alert.Message)
-		} else if alert.Category&int(lt.AlertDebugNotification) != 0 {
-			log.Debugf("%s: %s", alert.What, alert.Message)
-		} else if alert.Category&int(lt.AlertPerformanceWarning) != 0 {
-			log.Warningf("%s: %s", alert.What, alert.Message)
-		} else {
-			log.Noticef("%s: %s", alert.What, alert.Message)
+
+	for {
+		select {
+		case <-pc:
+			log.Debugf("Stopping service alerts")
+			return
+
+		case alert, ok := <-alerts:
+			if !ok { // was the alerts channel closed?
+				return
+			}
+
+			// Skipping Tracker communication, Save_Resume, UDP errors
+			// No need to spam logs.
+			if alert.Category&int(lt.SaveResumeDataAlertAlertType) != 0 ||
+				alert.Category&int(lt.UdpErrorAlertAlertType) != 0 ||
+				alert.Category&int(lt.AlertBlockProgressNotification) != 0 ||
+				alert.Category&int(lt.TrackerReplyAlertAlertType) != 0 ||
+				alert.Category&int(lt.DhtReplyAlertAlertType) != 0 ||
+				alert.Category&int(lt.StateChangedAlertAlertType) != 0 ||
+				alert.Category&int(lt.TorrentFinishedAlertAlertType) != 0 ||
+				alert.Category&int(lt.DhtLogAlertStaticCategory) != 0 {
+				continue
+			} else if alert.Category&int(lt.AlertErrorNotification) != 0 {
+				log.Errorf("%s: %s", alert.What, alert.Message)
+			} else if alert.Category&int(lt.AlertDebugNotification) != 0 {
+				log.Debugf("%s: %s", alert.What, alert.Message)
+			} else if alert.Category&int(lt.AlertPerformanceWarning) != 0 {
+				log.Warningf("%s: %s", alert.What, alert.Message)
+			} else {
+				log.Noticef("%s: %s", alert.What, alert.Message)
+			}
 		}
 	}
 }
@@ -1472,12 +1484,15 @@ func (s *Service) onDownloadProgress() {
 
 					log.Infof("Moving torrent '%s' to completed folder", t.Name())
 					log.Info("Removing the torrent without deleting files after Completed move ...")
+
+					// Removing torrent from libtorrent session before moving files physically
 					s.RemoveTorrent(xbmcHost, t, RemoveOptions{ForceDrop: true, ForceKeepTorrentData: true})
 
 					if len(t.files) <= 0 {
 						return errors.New("No files listed in the torrent")
 					}
 
+					// Move files one by one from torrent
 					for _, filePath := range filesToMove {
 						fileName := filepath.Base(filePath)
 

@@ -137,14 +137,26 @@ func NewTorrentFSEntry(file http.File, tfs *TorrentFS, t *Torrent, f *File, name
 func (tf *TorrentFSEntry) consumeAlerts() {
 	alerts, done := tf.tfs.s.Alerts()
 	defer close(done)
+	pc := tf.t.Closer.C()
 
-	for alert := range alerts {
-		switch alert.Type {
-		case lt.TorrentRemovedAlertAlertType:
-			removedAlert := lt.SwigcptrTorrentAlert(alert.Pointer)
-			if tf.t.Closer.IsSet() || hex.EncodeToString([]byte(removedAlert.GetHandle().InfoHash().ToString())) == tf.t.infoHash {
-				tf.removed.Set()
+	for {
+		select {
+		case <-pc:
+			log.Debugf("Stopping torrentfs alerts")
+			return
+
+		case alert, ok := <-alerts:
+			if !ok { // was the alerts channel closed?
 				return
+			}
+
+			switch alert.Type {
+			case lt.TorrentRemovedAlertAlertType:
+				removedAlert := lt.SwigcptrTorrentAlert(alert.Pointer)
+				if tf.t.Closer.IsSet() || hex.EncodeToString([]byte(removedAlert.GetHandle().InfoHash().ToString())) == tf.t.infoHash {
+					tf.removed.Set()
+					return
+				}
 			}
 		}
 	}
