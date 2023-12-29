@@ -304,11 +304,14 @@ var (
 
 		LogPath string `help:"Log location path"`
 
-		ConfigPath   string `help:"Custom path to Elementum config (Yaml or JSON format)"`
-		AddonPath    string `help:"Custom path to addon folder (where Kodi stored files, coming with addon zip)"`
-		ProfilePath  string `help:"Custom path to addon files folder (where Elementum will write data)"`
-		LibraryPath  string `help:"Custom path to addon library folder"`
-		TorrentsPath string `help:"Custom path to addon downloads folder"`
+		ConfigPath     string `help:"Custom path to Elementum config (Yaml or JSON format)"`
+		AddonPath      string `help:"Custom path to addon folder (where Kodi stored files, coming with addon zip)"`
+		ProfilePath    string `help:"Custom path to addon files folder (where Elementum will write data)"`
+		LibraryPath    string `help:"Custom path to addon library folder"`
+		TorrentsPath   string `help:"Custom path to addon torrent files folder"`
+		DownloadsPath  string `help:"Custom path to addon downloads folder"`
+		MoveMoviesPath string `help:"Custom path to addon folder, used for moving completed Movie downloads"`
+		MoveShowsPath  string `help:"Custom path to addon folder, used for moving completed Show downloads"`
 
 		ExportConfig string `help:"Export current configuration, taken from Kodi into a file. Should end with json or yml suffix"`
 	}{
@@ -460,6 +463,9 @@ func Reload() (ret *Configuration, err error) {
 	}
 	if Args.TorrentsPath != "" {
 		torrentsPath = Args.TorrentsPath
+	}
+	if Args.DownloadsPath != "" {
+		downloadPath = Args.DownloadsPath
 	}
 
 	if downloadStorage != StorageMemory {
@@ -729,6 +735,14 @@ func Reload() (ret *Configuration, err error) {
 
 		LocalOnlyClient: settings.ToBool("local_only_client"),
 		LogLevel:        settings.ToInt("log_level"),
+	}
+
+	// Use custom Move locations provided by CLI
+	if Args.MoveMoviesPath != "" {
+		newConfig.CompletedMoviesPath = Args.MoveMoviesPath
+	}
+	if Args.MoveShowsPath != "" {
+		newConfig.CompletedShowsPath = Args.MoveShowsPath
 	}
 
 	reDNS := regexp.MustCompile(`\s*,\s*`)
