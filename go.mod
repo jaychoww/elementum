@@ -30,7 +30,7 @@ require (
 	github.com/spf13/cast v1.6.0
 	github.com/tinylib/msgp v1.1.9
 	github.com/valyala/bytebufferpool v1.0.0
-	github.com/vmihailenco/msgpack v4.0.4+incompatible
+	github.com/vmihailenco/msgpack/v4 v4.3.13
 	github.com/zeebo/bencode v1.0.0
 	go.etcd.io/bbolt v1.3.8
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -76,6 +76,8 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
+	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
+	github.com/vmihailenco/tagparser v0.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	golang.org/x/arch v0.6.0 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
