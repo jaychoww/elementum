@@ -472,12 +472,12 @@ func Reload() (ret *Configuration, err error) {
 		if downloadPath == "." {
 			err = fmt.Errorf("Can't continue because download path is empty")
 			settingsWarning = "LOCALIZE[30113]"
-			exit.Panic(err)
+			exit.PanicCovered(err)
 			return nil, err
 		} else if err := util.IsWritablePath(downloadPath); err != nil {
 			err = fmt.Errorf("Cannot write to download location '%s': %#v", downloadPath, err)
 			settingsWarning = err.Error()
-			exit.Panic(err)
+			exit.PanicCovered(err)
 			return nil, err
 		}
 	}
@@ -486,20 +486,20 @@ func Reload() (ret *Configuration, err error) {
 	if libraryPath == "." {
 		err = fmt.Errorf("Cannot use library location '%s'", libraryPath)
 		settingsWarning = "LOCALIZE[30220]"
-		exit.Panic(err)
+		exit.PanicCovered(err)
 		return nil, err
 	} else if strings.Contains(libraryPath, "elementum_library") {
 		if err := os.MkdirAll(libraryPath, 0777); err != nil {
 			err = fmt.Errorf("Could not create temporary library directory: %#v", err)
 			settingsWarning = err.Error()
-			exit.Panic(err)
+			exit.PanicCovered(err)
 			return nil, err
 		}
 	}
 	if err := util.IsWritablePath(libraryPath); err != nil {
 		err = fmt.Errorf("Cannot write to library location '%s': %#v", libraryPath, err)
 		settingsWarning = err.Error()
-		exit.Panic(err)
+		exit.PanicCovered(err)
 		return nil, err
 	}
 	log.Infof("Using library path: %s", libraryPath)
@@ -510,14 +510,14 @@ func Reload() (ret *Configuration, err error) {
 		if err := os.MkdirAll(torrentsPath, 0777); err != nil {
 			err = fmt.Errorf("Could not create temporary torrents directory: %#v", err)
 			settingsWarning = err.Error()
-			exit.Panic(err)
+			exit.PanicCovered(err)
 			return nil, err
 		}
 	}
 	if err := util.IsWritablePath(torrentsPath); err != nil {
 		err = fmt.Errorf("Cannot write to location '%s': %#v", torrentsPath, err)
 		settingsWarning = err.Error()
-		exit.Panic(err)
+		exit.PanicCovered(err)
 		return nil, err
 	}
 	log.Infof("Using torrents path: %s", torrentsPath)

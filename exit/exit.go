@@ -57,6 +57,10 @@ func Exit(code int) {
 	os.Exit(Code)
 }
 
+func PanicCovered(err error) {
+	panic(err)
+}
+
 func Panic(err error) {
 	PanicWithCode(err, ExitCodeError)
 }
