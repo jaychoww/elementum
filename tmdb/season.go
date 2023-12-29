@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
@@ -131,7 +132,7 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 		}
 
 		if !config.Get().ShowUnairedSeasons {
-			if _, isExpired := util.AirDateWithExpireCheck(season.AirDate, config.Get().ShowEpisodesOnReleaseDay); isExpired {
+			if _, isExpired := util.AirDateWithExpireCheck(season.AirDate, time.DateOnly, config.Get().ShowEpisodesOnReleaseDay); isExpired {
 				continue
 			}
 		}
@@ -169,7 +170,9 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 		name = "Specials"
 	}
 
-	season.EpisodeCount = season.countEpisodesNumber(show)
+	if config.Get().ShowUnwatchedEpisodesNumber {
+		season.EpisodeCount = season.countEpisodesNumber()
+	}
 
 	item := &xbmc.ListItem{
 		Label: name,
@@ -330,7 +333,7 @@ func (season *Season) countWatchedEpisodesNumber(show *Show) (watchedEpisodes in
 				if episode.AirDate == "" {
 					continue
 				}
-				if _, isExpired := util.AirDateWithExpireCheck(episode.AirDate, c.ShowEpisodesOnReleaseDay); isExpired {
+				if _, isExpired := util.AirDateWithExpireCheck(episode.AirDate, time.DateOnly, c.ShowEpisodesOnReleaseDay); isExpired {
 					continue
 				}
 			}
@@ -344,8 +347,8 @@ func (season *Season) countWatchedEpisodesNumber(show *Show) (watchedEpisodes in
 }
 
 // countEpisodesNumber returns number of episodes
-func (season *Season) countEpisodesNumber(show *Show) (episodes int) {
-	if show == nil || season.Episodes == nil {
+func (season *Season) countEpisodesNumber() (episodes int) {
+	if season.Episodes == nil {
 		return season.EpisodeCount
 	}
 
@@ -362,7 +365,7 @@ func (season *Season) countEpisodesNumber(show *Show) (episodes int) {
 			if episode.AirDate == "" {
 				continue
 			}
-			if _, isExpired := util.AirDateWithExpireCheck(episode.AirDate, c.ShowEpisodesOnReleaseDay); isExpired {
+			if _, isExpired := util.AirDateWithExpireCheck(episode.AirDate, time.DateOnly, c.ShowEpisodesOnReleaseDay); isExpired {
 				continue
 			}
 		}
