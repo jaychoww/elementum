@@ -467,7 +467,7 @@ func AddTorrent(s *bittorrent.Service) gin.HandlerFunc {
 
 		if t == nil {
 			var err error
-			t, err = s.AddTorrent(xbmcHost, uri, false, config.Get().DownloadStorage, true, time.Now())
+			t, err = s.AddTorrent(xbmcHost, bittorrent.AddOptions{URI: uri, Paused: false, DownloadStorage: config.Get().DownloadStorage, FirstTime: true, AddedTime: time.Now()})
 			if err != nil {
 				ctx.String(404, err.Error())
 				return
@@ -534,7 +534,7 @@ func MoveTorrent(s *bittorrent.Service) gin.HandlerFunc {
 		}
 
 		torrentsLog.Infof("Marking %s to be moved...", torrent.Name())
-		s.MarkedToMove = torrent.InfoHash()
+		torrent.IsMarkedToMove = true
 
 		xbmcHost.Refresh()
 		ctx.String(200, "")
@@ -576,7 +576,7 @@ func RemoveTorrent(s *bittorrent.Service) gin.HandlerFunc {
 			return
 		}
 
-		s.RemoveTorrent(xbmcHost, torrent, true, deleteFiles == "true", false)
+		s.RemoveTorrent(xbmcHost, torrent, bittorrent.RemoveOptions{ForceDrop: true, ForceDelete: deleteFiles == "true"})
 
 		xbmcHost.Refresh()
 		ctx.String(200, "")

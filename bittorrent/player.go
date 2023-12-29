@@ -188,7 +188,7 @@ func (btp *Player) addTorrent() error {
 			storage = config.StorageFile
 		}
 
-		torrent, err := btp.s.AddTorrent(btp.xbmcHost, btp.p.URI, false, storage, true, time.Now())
+		torrent, err := btp.s.AddTorrent(btp.xbmcHost, AddOptions{URI: btp.p.URI, Paused: false, DownloadStorage: storage, FirstTime: true, AddedTime: time.Now()})
 		if err != nil {
 			log.Errorf("Error adding torrent to player: %s", err)
 			return err
@@ -244,12 +244,6 @@ func (btp *Player) Buffer() error {
 		}
 	}
 
-	// If needed select more files for download
-	if config.Get().DownloadFileStrategy != DownloadFilePlaying &&
-		!btp.t.IsMemoryStorage() {
-		go btp.t.SelectDownloadFiles(btp)
-	}
-
 	go btp.processMetadata()
 
 	if btp.p.Background {
@@ -285,6 +279,11 @@ func (btp *Player) Buffer() error {
 		return err.(error)
 	} else if !btp.HasChosenFile() {
 		return errors.New("File not chosen")
+	}
+
+	// If needed select more files for download
+	if config.Get().DownloadFileStrategy != DownloadFilePlaying && !btp.t.IsMemoryStorage() {
+		go btp.t.SelectDownloadFiles(btp)
 	}
 
 	return nil
@@ -533,7 +532,7 @@ func (btp *Player) Close() {
 	// Remove torrent only if this torrent is not needed for background download or other players are using it.
 	if !btp.p.Background && btp.t.PlayerAttached <= 1 {
 		// If there is no chosen file - we stop the torrent and remove everything
-		btp.s.RemoveTorrent(btp.xbmcHost, btp.t, false, btp.notEnoughSpace, btp.IsWatched())
+		btp.s.RemoveTorrent(btp.xbmcHost, btp.t, RemoveOptions{ForceDelete: btp.notEnoughSpace, IsWatched: btp.IsWatched()})
 	}
 }
 

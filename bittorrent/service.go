@@ -68,8 +68,6 @@ type Service struct {
 
 	dialogProgressBG *xbmc.DialogProgressBG
 
-	MarkedToMove string
-
 	alertsBroadcaster *broadcast.Broadcaster
 	Closer            event.Event
 	CloserNotifier    event.Event
@@ -655,15 +653,15 @@ func (s *Service) checkAvailableSpace(xbmcHost *xbmc.XBMCHost, t *Torrent) bool 
 }
 
 // AddTorrent ...
-func (s *Service) AddTorrent(xbmcHost *xbmc.XBMCHost, uri string, paused bool, downloadStorage int, firstTime bool, addedTime time.Time) (*Torrent, error) {
+func (s *Service) AddTorrent(xbmcHost *xbmc.XBMCHost, options AddOptions) (*Torrent, error) {
 	defer perf.ScopeTimer()()
 
 	// To make sure no spaces coming from Web UI
-	uri = strings.TrimSpace(uri)
+	options.URI = strings.TrimSpace(options.URI)
 
-	log.Infof("Adding torrent from %s", uri)
+	log.Infof("Adding torrent from %s", options.URI)
 
-	if downloadStorage != config.StorageMemory && s.config.DownloadPath == "." {
+	if options.DownloadStorage != config.StorageMemory && s.config.DownloadPath == "." {
 		log.Warningf("Cannot add torrent since download path is not set")
 		if xbmcHost != nil {
 			xbmcHost.Notify("Elementum", "LOCALIZE[30113]", config.AddonIcon())
@@ -674,7 +672,7 @@ func (s *Service) AddTorrent(xbmcHost *xbmc.XBMCHost, uri string, paused bool, d
 	torrentParams := lt.NewAddTorrentParams()
 	defer lt.DeleteAddTorrentParams(torrentParams)
 
-	if downloadStorage == config.StorageMemory {
+	if options.DownloadStorage == config.StorageMemory {
 		torrentParams.SetMemoryStorage(s.GetMemorySize())
 	}
 
@@ -688,20 +686,20 @@ func (s *Service) AddTorrent(xbmcHost *xbmc.XBMCHost, uri string, paused bool, d
 	var private bool
 
 	// Dummy check if torrent file is a file containing a magnet link
-	if _, err := os.Stat(uri); err == nil {
-		dat, err := os.ReadFile(uri)
+	if _, err := os.Stat(options.URI); err == nil {
+		dat, err := os.ReadFile(options.URI)
 		if err == nil && bytes.HasPrefix(dat, []byte("magnet:")) {
-			uri = string(dat)
+			options.URI = string(dat)
 		}
 	}
 
-	if strings.HasPrefix(uri, "magnet:") {
+	if strings.HasPrefix(options.URI, "magnet:") {
 		// Remove all spaces in magnet
-		uri = strings.Replace(uri, " ", "", -1)
+		options.URI = strings.Replace(options.URI, " ", "", -1)
 
 		ec := lt.NewErrorCode()
 		defer lt.DeleteErrorCode(ec)
-		lt.ParseMagnetUri(uri, torrentParams, ec)
+		lt.ParseMagnetUri(options.URI, torrentParams, ec)
 		if ec.Failed() {
 			return nil, errors.New(ec.Message().(string))
 		}
@@ -716,24 +714,24 @@ func (s *Service) AddTorrent(xbmcHost *xbmc.XBMCHost, uri string, paused bool, d
 		shaHash := torrentParams.GetInfoHash().ToString()
 		infoHash = hex.EncodeToString([]byte(shaHash))
 	} else {
-		if strings.HasPrefix(uri, "http") {
-			torrent := NewTorrentFile(uri)
+		if strings.HasPrefix(options.URI, "http") {
+			torrent := NewTorrentFile(options.URI)
 
 			if err = torrent.Resolve(); err != nil {
-				log.Warningf("Could not resolve torrent %s: %s", uri, err)
+				log.Warningf("Could not resolve torrent %s: %s", options.URI, err)
 				return nil, err
 			}
-			uri = torrent.URI
+			options.URI = torrent.URI
 		}
 
-		if _, err := os.Stat(uri); err != nil {
-			log.Warningf("Cannot open torrent file at %s: %s", uri, err)
+		if _, err := os.Stat(options.URI); err != nil {
+			log.Warningf("Cannot open torrent file at %s: %s", options.URI, err)
 			return nil, err
 		}
 
-		log.Debugf("Adding torrent: %#v", uri)
+		log.Debugf("Adding torrent: %#v", options.URI)
 
-		info := lt.NewTorrentInfo(uri)
+		info := lt.NewTorrentInfo(options.URI)
 		private = info.Priv()
 		defer lt.DeleteTorrentInfo(info)
 		torrentParams.SetTorrentInfo(info)
@@ -756,7 +754,7 @@ func (s *Service) AddTorrent(xbmcHost *xbmc.XBMCHost, uri string, paused bool, d
 	torrentParams.SetSavePath(s.config.DownloadPath)
 
 	skipPriorities := false
-	if downloadStorage != config.StorageMemory {
+	if options.DownloadStorage != config.StorageMemory {
 		log.Infof("Checking for fast resume data in %s.fastresume", infoHash)
 		fastResumeFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
 		if _, err := os.Stat(fastResumeFile); err == nil {
@@ -794,13 +792,13 @@ func (s *Service) AddTorrent(xbmcHost *xbmc.XBMCHost, uri string, paused bool, d
 	if err != nil {
 		return nil, err
 	}
-	if !paused {
+	if !options.Paused {
 		th.Resume()
 	}
 
 	// modify trackers
 	log.Debugf("Loaded torrent has %d trackers", th.Trackers().Size()) // from *.fastresume
-	if ((config.Get().ModifyTrackersStrategy == modifyTrackersFirstTime && firstTime) || config.Get().ModifyTrackersStrategy == modifyTrackersEveryTime) && !private {
+	if ((config.Get().ModifyTrackersStrategy == modifyTrackersFirstTime && options.FirstTime) || config.Get().ModifyTrackersStrategy == modifyTrackersEveryTime) && !private {
 		if config.Get().RemoveOriginalTrackers {
 			log.Debug("Remove original trackers from torrent")
 			trackers := lt.NewStdVectorAnnounceEntry()
@@ -838,23 +836,23 @@ func (s *Service) AddTorrent(xbmcHost *xbmc.XBMCHost, uri string, paused bool, d
 		log.Debugf("After modifications loaded torrent has %d trackers", th.Trackers().Size())
 	}
 
-	log.Infof("Setting sequential download to: %v", downloadStorage != config.StorageMemory)
-	th.SetSequentialDownload(downloadStorage != config.StorageMemory)
+	log.Infof("Setting sequential download to: %v", options.DownloadStorage != config.StorageMemory)
+	th.SetSequentialDownload(options.DownloadStorage != config.StorageMemory)
 
-	log.Infof("Adding new torrent item with url: %s", uri)
-	t := NewTorrent(s, th, th.TorrentFile(), uri, downloadStorage)
+	log.Infof("Adding new torrent item with url: %s", options.URI)
+	t := NewTorrent(s, th, th.TorrentFile(), options.URI, options.DownloadStorage)
 
-	if downloadStorage == config.StorageMemory {
+	if options.DownloadStorage == config.StorageMemory {
 		t.MemorySize = s.GetMemorySize()
 	}
 
-	t.addedTime = addedTime
+	t.addedTime = options.AddedTime
 	s.q.Add(t)
 
 	if !t.HasMetadata() {
 		if err := t.WaitForMetadata(xbmcHost, infoHash); err != nil {
 			log.Infof("Auto removing torrent %s after not getting metadata", infoHash)
-			s.RemoveTorrent(xbmcHost, t, false, false, false)
+			s.RemoveTorrent(xbmcHost, t, RemoveOptions{})
 			return nil, err
 		}
 	}
@@ -869,7 +867,7 @@ func (s *Service) AddTorrent(xbmcHost *xbmc.XBMCHost, uri string, paused bool, d
 }
 
 // RemoveTorrent ...
-func (s *Service) RemoveTorrent(xbmcHost *xbmc.XBMCHost, t *Torrent, forceDrop, forceDelete, isWatched bool) bool {
+func (s *Service) RemoveTorrent(xbmcHost *xbmc.XBMCHost, t *Torrent, flags RemoveOptions) bool {
 	log.Infof("Removing torrent: %s", t.Name())
 	if t == nil {
 		return false
@@ -891,14 +889,14 @@ func (s *Service) RemoveTorrent(xbmcHost *xbmc.XBMCHost, t *Torrent, forceDrop, 
 	}
 
 	keepDownloading := false
-	if forceDrop || configKeepDownloading == 2 || len(t.ChosenFiles) == 0 {
+	if flags.ForceDrop || configKeepDownloading == 2 || len(t.ChosenFiles) == 0 {
 		keepDownloading = false
 	} else if configKeepDownloading == 0 || (xbmcHost != nil && xbmcHost.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30146];;%s", t.Name()))) {
 		keepDownloading = true
 	}
 
 	keepSetting := configKeepFilesPlaying
-	if isWatched {
+	if flags.IsWatched {
 		keepSetting = configKeepFilesFinished
 	}
 
@@ -906,9 +904,9 @@ func (s *Service) RemoveTorrent(xbmcHost *xbmc.XBMCHost, t *Torrent, forceDrop, 
 	deleteTorrentData := false
 
 	if !keepDownloading {
-		if forceDelete || len(t.ChosenFiles) == 0 {
+		if flags.ForceDelete || len(t.ChosenFiles) == 0 {
 			deleteTorrentData = true
-		} else if keepSetting == 0 {
+		} else if flags.ForceKeepTorrentData || keepSetting == 0 {
 			deleteTorrentData = false
 		} else if keepSetting == 2 || (xbmcHost != nil && xbmcHost.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30269];;%s", t.Name()))) {
 			deleteTorrentData = true
@@ -1212,7 +1210,7 @@ func (s *Service) loadTorrentFiles() {
 		filePath := filepath.Join(s.config.TorrentsPath, torrentFile.Name())
 		log.Infof("Loading torrent file %s", torrentFile.Name())
 
-		t, err := s.AddTorrent(xbmcHost, filePath, s.config.AutoloadTorrentsPaused, config.StorageFile, false, torrentFile.ModTime())
+		t, err := s.AddTorrent(xbmcHost, AddOptions{URI: filePath, Paused: s.config.AutoloadTorrentsPaused, DownloadStorage: config.StorageFile, FirstTime: false, AddedTime: torrentFile.ModTime()})
 		if err != nil {
 			log.Warningf("Cannot add torrent from existing file %s: %s", filePath, err)
 			continue
@@ -1400,15 +1398,15 @@ func (s *Service) onDownloadProgress() {
 					}
 				}
 
-				if s.MarkedToMove != "" && infoHash == s.MarkedToMove {
-					s.MarkedToMove = ""
+				if t.IsMarkedToMove {
+					t.IsMarkedToMove = false
 					status = StatusStrings[StatusSeeding]
 				}
 
 				//
 				// Handle moving completed downloads
 				//
-				if t.IsMemoryStorage() || !s.config.CompletedMove || status != StatusStrings[StatusSeeding] || s.anyPlayerIsPlaying() {
+				if t.IsMemoryStorage() || !s.config.CompletedMove || status != StatusStrings[StatusSeeding] || s.anyPlayerIsPlaying() || t.IsMoveInProgress {
 					continue
 				}
 				if xbmcHost != nil && xbmcHost.PlayerIsPlaying() {
@@ -1419,7 +1417,16 @@ func (s *Service) onDownloadProgress() {
 					continue
 				}
 
-				func() error {
+				go func(t *Torrent) error {
+					if t.IsMoveInProgress {
+						return nil
+					}
+
+					defer func() {
+						t.IsMoveInProgress = false
+					}()
+					t.IsMoveInProgress = true
+
 					item := database.GetStorm().GetBTItem(infoHash)
 					if item == nil {
 						warnedMissing[infoHash] = true
@@ -1454,43 +1461,24 @@ func (s *Service) onDownloadProgress() {
 						}
 					}
 
-					log.Info("Removing the torrent without deleting files after Completed move ...")
-					t := s.GetTorrentByHash(infoHash)
-					s.RemoveTorrent(xbmcHost, t, false, false, false)
-
-					// Delete leftover .parts file if any
-					partsFile := filepath.Join(config.Get().DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
-					os.Remove(partsFile)
-
-					// Delete fast resume data
-					fastResumeFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
-					if _, err := os.Stat(fastResumeFile); err == nil {
-						log.Info("Deleting fast resume data at", fastResumeFile)
-						if err := os.Remove(fastResumeFile); err != nil {
-							log.Error(err)
-							return err
-						}
-					}
-
-					// Delete torrent file
-					torrentFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
-					if _, err := os.Stat(torrentFile); err == nil {
-						log.Info("Deleting torrent file at ", torrentFile)
-						if err := os.Remove(torrentFile); err != nil {
-							log.Error(err)
-							return err
-						}
-					}
-
-					if len(item.Files) <= 0 {
-						return errors.New("No files saved for BTItem")
-					}
-
+					// Preparing list of files that need to be moved
 					torrentInfo := torrentHandle.TorrentFile()
-					for _, fp := range item.Files {
-						f := t.GetFileByPath(fp)
+					filesToMove := []string{}
+					filesToCleanup := map[string]bool{}
+					for _, fp := range t.files {
+						f := t.GetFileByPath(fp.Path)
+						filesToMove = append(filesToMove, torrentInfo.Files().FilePath(f.Index))
+					}
 
-						filePath := torrentInfo.Files().FilePath(f.Index)
+					log.Infof("Moving torrent '%s' to completed folder", t.Name())
+					log.Info("Removing the torrent without deleting files after Completed move ...")
+					s.RemoveTorrent(xbmcHost, t, RemoveOptions{ForceDrop: true, ForceKeepTorrentData: true})
+
+					if len(t.files) <= 0 {
+						return errors.New("No files listed in the torrent")
+					}
+
+					for _, filePath := range filesToMove {
 						fileName := filepath.Base(filePath)
 
 						extracted := ""
@@ -1522,9 +1510,9 @@ func (s *Service) onDownloadProgress() {
 
 						var dstPath string
 						if item.Type == "movie" {
-							dstPath = filepath.Dir(s.config.CompletedMoviesPath)
+							dstPath = util.EffectiveDir(s.config.CompletedMoviesPath)
 						} else {
-							dstPath = filepath.Dir(s.config.CompletedShowsPath)
+							dstPath = util.EffectiveDir(s.config.CompletedShowsPath)
 							if item.ShowID > 0 {
 								show := tmdb.GetShow(item.ShowID, config.Get().Language)
 								if show != nil {
@@ -1539,31 +1527,36 @@ func (s *Service) onDownloadProgress() {
 							}
 						}
 
-						go func() {
-							log.Infof("Moving %s to %s", fileName, dstPath)
-							srcPath := filepath.Join(s.config.DownloadPath, filePath)
-							if dst, err := util.Move(srcPath, dstPath); err != nil {
-								log.Error(err)
-							} else {
-								// Remove leftover folders
-								if dirPath := filepath.Dir(filePath); dirPath != "." {
-									os.RemoveAll(filepath.Dir(srcPath))
-									if extracted != "" {
-										parentPath := filepath.Clean(filepath.Join(filepath.Dir(srcPath), ".."))
-										if parentPath != "." && parentPath != s.config.DownloadPath {
-											os.RemoveAll(parentPath)
-										}
+						srcPath := filepath.Join(s.config.DownloadPath, filePath)
+						log.Infof("Moving file %s to %s", srcPath, dstPath)
+						if dst, err := util.Move(srcPath, dstPath); err != nil {
+							log.Error(err)
+						} else {
+							log.Warning(fileName, "moved to", dst)
+
+							if dirPath := filepath.Dir(filePath); dirPath != "." {
+								filesToCleanup[filepath.Dir(srcPath)] = true
+								if extracted != "" {
+									parentPath := filepath.Clean(filepath.Join(filepath.Dir(srcPath), ".."))
+									if parentPath != "." && parentPath != s.config.DownloadPath {
+										filesToCleanup[parentPath] = true
 									}
 								}
-								log.Warning(fileName, "moved to", dst)
-
-								log.Infof("Marking %s for removal from library and database...", torrentName)
-								database.GetStorm().UpdateBTItemStatus(infoHash, Remove)
 							}
-						}()
+						}
 					}
+
+					// Remove leftover folders
+					for filePath := range filesToCleanup {
+						log.Infof("Removing all from %s", filePath)
+						os.RemoveAll(filePath)
+					}
+
+					log.Infof("Marking %s for removal from library and database...", torrentName)
+					database.GetStorm().UpdateBTItemStatus(infoHash, Remove)
+
 					return nil
-				}()
+				}(t)
 			}
 
 			totalActive := len(activeTorrents)
@@ -2039,7 +2032,7 @@ func (s *Service) StopNextFiles() {
 			log.Infof("Stopping torrent '%s' as a not-needed next episode", t.Name())
 
 			t.stopNextTimer()
-			s.RemoveTorrent(xbmcHost, t, false, false, false)
+			s.RemoveTorrent(xbmcHost, t, RemoveOptions{})
 		}
 	}
 

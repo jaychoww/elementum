@@ -176,6 +176,7 @@ func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 
 	currentOffset, err := tf.File.Seek(0, io.SeekCurrent)
 	if err != nil {
+		log.Infof("Seek failed with error: %s", err)
 		return 0, err
 	}
 
@@ -187,7 +188,7 @@ func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 		size := left
 
 		if err = tf.waitForPiece(piece); err != nil {
-			log.Debugf("Wait failed: %d", piece)
+			log.Infof("Wait failed for piece %d: %s", piece, err)
 			continue
 		}
 
@@ -211,6 +212,7 @@ func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 				time.Sleep(500 * time.Millisecond)
 				continue
 			}
+			log.Infof("Read failed for piece %d: %s", piece, err)
 			return
 		} else if n1 > 0 {
 			n += n1

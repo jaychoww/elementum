@@ -76,6 +76,8 @@ type Torrent struct {
 	BufferPiecesProgress   map[int]float64
 	MemorySize             int64
 
+	IsMoveInProgress         bool
+	IsMarkedToMove           bool
 	IsPlaying                bool
 	IsPaused                 bool
 	IsBuffering              bool
@@ -218,7 +220,7 @@ func (t *Torrent) Watch() {
 
 		case <-t.nextTimer.C:
 			if t.IsNextFile {
-				go t.Service.RemoveTorrent(nil, t, false, false, false)
+				go t.Service.RemoveTorrent(nil, t, RemoveOptions{})
 			}
 
 		case <-updateMetadataTicker.C:
@@ -1022,7 +1024,7 @@ func (t *Torrent) DownloadFileWithPriority(addFile *File, priority int) {
 			continue
 		}
 
-		log.Debugf("Choosing file for download: %s", f.Path)
+		log.Debugf("Choosing file for download with priority %d: %s", priority, f.Path)
 		t.th.FilePriority(f.Index, priority)
 
 		// Need to sleep because file_priority is executed async

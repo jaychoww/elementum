@@ -218,3 +218,12 @@ func IsValidPath(path string) bool {
 
 	return true
 }
+
+// EffectiveDir is checking argument path and returning closest folder.
+func EffectiveDir(p string) string {
+	if info, err := os.Stat(p); err == nil && info != nil && info.IsDir() {
+		return p
+	}
+
+	return filepath.Dir(p)
+}

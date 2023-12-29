@@ -1,5 +1,7 @@
 package bittorrent
 
+import "time"
+
 const (
 	movieType   = "movie"
 	showType    = "show"
@@ -150,4 +152,21 @@ const (
 
 func byPath(l, r *File) bool {
 	return l.Path < r.Path
+}
+
+// AddOptions is setting options for different torrent add procedures
+type AddOptions struct {
+	URI             string
+	Paused          bool
+	DownloadStorage int
+	FirstTime       bool
+	AddedTime       time.Time
+}
+
+// RemoveOptions is setting options for different torrent removal procedures
+type RemoveOptions struct {
+	ForceKeepTorrentData bool
+	ForceDrop            bool
+	ForceDelete          bool
+	IsWatched            bool
 }
