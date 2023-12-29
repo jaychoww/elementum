@@ -1194,7 +1194,8 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 	}
 
 	// Sync back removed Shows, meaning removing them from Kodi library.
-	if removeEnabled && len(removedShows) > 0 {
+	// Ignoring watchlist items, because Trakt is automatically removing whole show from Watchlist if any episode is watched.
+	if removeEnabled && len(removedShows) > 0 && listID != "watchlist" {
 		if err := syncShowsRemovedBack(removedShows); err != nil {
 			log.Warningf("Could not sync back removed shows: %s", err)
 		}
