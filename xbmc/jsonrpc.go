@@ -38,6 +38,7 @@ func Init() {
 	mu.Lock()
 	defer mu.Unlock()
 
+	XBMCHosts = []*XBMCHost{}
 	for _, host := range []string{
 		"::1",
 		"127.0.0.1",

@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,8 +25,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var log = logging.MustGetLogger("config")
-var privacyRegex = regexp.MustCompile(`(?i)(pass|password|token): "(.+?)"`)
+var (
+	log          = logging.MustGetLogger("config")
+	privacyRegex = regexp.MustCompile(`(?i)(pass|password|token): "(.+?)"`)
+
+	isUpdating = false
+)
 
 const (
 	maxMemorySize                = 400 * 1024 * 1024
@@ -331,6 +336,16 @@ func Get() *Configuration {
 
 // Reload ...
 func Reload() (ret *Configuration, err error) {
+	// Avoid running multiple reloads at once.
+	if isUpdating {
+		return config, errors.New("config is already reloading")
+	}
+
+	isUpdating = true
+	defer func() {
+		isUpdating = false
+	}()
+
 	log.Info("Reloading configuration...")
 
 	// Reloading RPC Hosts

@@ -8,8 +8,14 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/elgatito/elementum/exit"
+)
+
+var (
+	readFile  *os.File
+	writeFile *os.File
 )
 
 func initShared() {
@@ -22,10 +28,10 @@ func initLog(arg string) {
 
 	originalStdout := os.Stdout
 
-	r, w, _ := os.Pipe()
+	readFile, writeFile, _ = os.Pipe()
 
-	os.Stdout = w
-	os.Stderr = w
+	os.Stdout = writeFile
+	os.Stderr = writeFile
 
 	go func() {
 		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
@@ -36,7 +42,7 @@ func initLog(arg string) {
 		defer logFile.Close()
 
 		os.Stdout.WriteString(fmt.Sprintf("Redirecting Stdout/Stderr to %s\r\n", logPath))
-		scanner := bufio.NewScanner(r)
+		scanner := bufio.NewScanner(readFile)
 		for scanner.Scan() {
 			s := scanner.Text() + "\r\n"
 			logFile.WriteString(s)
@@ -54,10 +60,10 @@ func start() {
 
 //export startWithLog
 func startWithLog(log *C.char) int {
-	initShared()
 	initLog(C.GoString(log))
 
 	main()
+	closeFiles()
 
 	return exit.Code
 }
@@ -73,12 +79,25 @@ func startWithArgs(args *C.char) int {
 }
 
 //export startWithLogAndArgs
-func startWithLogAndArgs(log, args *C.char) int {
+func startWithLogAndArgs(logPath, args *C.char) int {
 	initShared()
-	initLog(C.GoString(log))
+	initLog(C.GoString(logPath))
 
 	exit.Args = C.GoString(args)
 	main()
+	closeFiles()
+
+	// Give time to write everything to log files
+	time.Sleep(1 * time.Second)
 
 	return exit.Code
+}
+
+func closeFiles() {
+	if readFile != nil {
+		readFile.Close()
+	}
+	if writeFile != nil {
+		writeFile.Close()
+	}
 }

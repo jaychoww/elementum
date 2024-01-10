@@ -38,8 +38,9 @@ import (
 )
 
 var (
-	log     = logging.MustGetLogger("main")
-	logPath = ""
+	log        = logging.MustGetLogger("main")
+	logPath    = ""
+	fileLogger *lumberjack.Logger
 )
 
 func init() {
@@ -87,6 +88,14 @@ func ensureSingleInstance(conf *config.Configuration) (lock *lockfile.LockFile, 
 	return
 }
 
+func stopLogging() {
+	if fileLogger != nil {
+		log.Infof("Stopping file logger")
+		fileLogger.Close()
+		fileLogger = nil
+	}
+}
+
 func setupLogging() {
 	var backend *logging.LogBackend
 
@@ -94,15 +103,18 @@ func setupLogging() {
 		logPath = config.Args.LogPath
 	}
 	if logPath != "" && util.IsWritablePath(filepath.Base(logPath)) == nil {
-		backend = logging.NewLogBackend(&lumberjack.Logger{
+		fileLogger = &lumberjack.Logger{
 			Filename:   logPath,
 			MaxSize:    10, // Size in Megabytes
 			MaxBackups: 5,
-		}, "", 0)
+		}
+		backend = logging.NewLogBackend(fileLogger, "", 0)
 	} else {
 		backend = logging.NewLogBackend(os.Stdout, "", 0)
 	}
 
+	// Make sure we reset to initial state before configuring logger instance
+	logging.Reset()
 	logging.SetFormatter(logging.MustStringFormatter(
 		`%{color}%{level:.4s}  %{module:-12s} ▶ %{shortfunc:-15s}  %{color:reset}%{message}`,
 	))
@@ -129,6 +141,8 @@ func main() {
 	setupLogging()
 
 	defer func() {
+		stopLogging()
+
 		if r := recover(); r != nil {
 			log.Errorf("Got a panic: %s", r)
 			log.Errorf("Stacktrace: \n" + string(debug.Stack()))
@@ -316,6 +330,7 @@ func main() {
 		exit.Panic(err)
 		return
 	}
+
 	if !exit.IsShared {
 		os.Exit(exit.Code)
 	}

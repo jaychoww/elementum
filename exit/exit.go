@@ -38,6 +38,7 @@ func Reset() {
 	lastExitCode = -1
 	Args = ""
 	Code = 0
+	Closer.Clear()
 }
 
 func Exit(code int) {
