@@ -114,10 +114,10 @@ GO_EXTRALDFLAGS =
 
 ifeq ($(IS_SHARED), no)
 	BUILD_PATH = build/$(TARGET_OS)_$(TARGET_ARCH)
-	BUILD_MODE = -tags binary
+	BUILD_MODE = -tags binary,go_json
 else
 	BUILD_PATH = build/$(TARGET_OS)_$(TARGET_ARCH)
-	BUILD_MODE = -buildmode=c-shared -tags shared
+	BUILD_MODE = -buildmode=c-shared -tags shared,go_json
 endif
 
 

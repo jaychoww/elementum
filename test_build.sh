@@ -73,6 +73,8 @@ then
     LOCAL_ENV=$CROSS_ROOT
 fi
 
+TAGS="binary,go_json"
+
 # This will run with local go using libtorrent-go/local-env/ locally copied dependencies compilation.
 export LOCAL_ENV=$LOCAL_ENV
 export PATH=$PATH:$LOCAL_ENV/bin/
@@ -82,7 +84,7 @@ export SWIG_LIB=$LOCAL_ENV/share/swig/4.1.1/
 if [ "${DEST_ACTION}" == "local" ]
 then
   set -e
-  test go build $GO_FLAGS -ldflags="-w -X github.com/elgatito/elementum/util/ident.Version=${GIT_VERSION}" -o /var/tmp/${DEST_NAME} .
+  test go build $GO_FLAGS -ldflags="-w -X github.com/elgatito/elementum/util/ident.Version=${GIT_VERSION}" -tags $TAGS -o /var/tmp/${DEST_NAME} .
   test chmod +x /var/tmp/elementum*
   mkdir -p $DEST_DIR/addons/plugin.video.elementum/resources/bin/$DEST_PLATFORM/
   mkdir -p $DEST_DIR/userdata/addon_data/plugin.video.elementum/bin/$DEST_PLATFORM/
@@ -93,8 +95,9 @@ then
   manage
 elif [ "${DEST_ACTION}" == "library" ]
 then
+  TAGS="shared,go_json"
   set -e
-  test go build -ldflags="-w -X github.com/elgatito/elementum/util/ident.Version=${GIT_VERSION}" -tags shared -buildmode=c-shared -o /var/tmp/${DEST_LIBRARY} .
+  test go build -ldflags="-w -X github.com/elgatito/elementum/util/ident.Version=${GIT_VERSION}" -tags $TAGS -buildmode=c-shared -o /var/tmp/${DEST_LIBRARY} .
   test chmod +x /var/tmp/elementum*
   mkdir -p $DEST_DIR/addons/plugin.video.elementum/resources/bin/$DEST_PLATFORM/
   mkdir -p $DEST_DIR/userdata/addon_data/plugin.video.elementum/bin/$DEST_PLATFORM/
@@ -105,7 +108,7 @@ elif [ "${DEST_ACTION}" == "sanitize" ]
 then
   # This will run with local go
   set -e
-  CGO_ENABLED=1 CGO_LDFLAGS='-fsanitize=leak -fsanitize=address' CGO_CFLAGS='-fsanitize=leak -fsanitize=address' test go build -ldflags="-w -X github.com/elgatito/elementum/util/ident.Version=${GIT_VERSION}" -o /var/tmp/elementum github.com/elgatito/elementum
+  CGO_ENABLED=1 CGO_LDFLAGS='-fsanitize=leak -fsanitize=address' CGO_CFLAGS='-fsanitize=leak -fsanitize=address' test go build -ldflags="-w -X github.com/elgatito/elementum/util/ident.Version=${GIT_VERSION}" -tags $TAGS -o /var/tmp/elementum github.com/elgatito/elementum
   test chmod +x /var/tmp/elementum*
   mkdir -p $DEST_DIR/addons/plugin.video.elementum/resources/bin/$DEST_PLATFORM/
   mkdir -p $DEST_DIR/userdata/addon_data/plugin.video.elementum/bin/$DEST_PLATFORM/
