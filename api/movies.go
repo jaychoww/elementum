@@ -18,7 +18,6 @@ import (
 	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/library/uid"
 	"github.com/elgatito/elementum/providers"
-	"github.com/elgatito/elementum/scrape"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/xbmc"
@@ -68,7 +67,6 @@ func MoviesIndex(ctx *gin.Context) {
 		{Label: "Trakt > LOCALIZE[30257]", Path: URLForXBMC("/movies/trakt/collection"), Thumbnail: config.AddonResource("img", "trakt.png"), ContextMenu: [][]string{{"LOCALIZE[30252]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/library/movie/list/add/collection"))}}, TraktAuth: true},
 		{Label: "Trakt > LOCALIZE[30290]", Path: URLForXBMC("/movies/trakt/calendars/"), Thumbnail: config.AddonResource("img", "most_anticipated.png"), TraktAuth: true},
 		{Label: "Trakt > LOCALIZE[30423]", Path: URLForXBMC("/movies/trakt/recommendations"), Thumbnail: config.AddonResource("img", "movies.png"), TraktAuth: true},
-		{Label: "LOCALIZE[30558]", Path: URLForXBMC("/movies/autoscraped"), Thumbnail: config.AddonResource("img", "trending.png")},
 		{Label: "Trakt > LOCALIZE[30422]", Path: URLForXBMC("/movies/trakt/toplists"), Thumbnail: config.AddonResource("img", "most_collected.png")},
 		{Label: "Trakt > LOCALIZE[30246]", Path: URLForXBMC("/movies/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
 		{Label: "Trakt > LOCALIZE[30210]", Path: URLForXBMC("/movies/trakt/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
@@ -451,29 +449,6 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 	}
 
 	ctx.JSON(200, xbmc.NewView("movies", filterListItems(items)))
-}
-
-// AutoscrapedMovies ...
-func AutoscrapedMovies(ctx *gin.Context) {
-	defer perf.ScopeTimer()()
-
-	sourceMovies, err := scrape.GetMovies()
-	if err != nil {
-		ctx.String(200, err.Error())
-		return
-	}
-
-	// Leave only movies, that have enough torrents found.
-	cacheDB := database.GetCache()
-	movies := make([]*trakt.Movies, 0, len(sourceMovies))
-	for _, m := range sourceMovies {
-		keyExists := scrape.GetMovieExistsKey(m.Movie.IDs.TMDB)
-		if v, err := cacheDB.GetCachedBool(database.CommonBucket, keyExists); err == nil && v {
-			movies = append(movies, m)
-		}
-	}
-
-	renderTraktMovies(ctx, movies, 1, 0)
 }
 
 // PopularMovies ...

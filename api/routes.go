@@ -127,7 +127,6 @@ func Routes(s *bittorrent.Service, shutdown func(code int)) *gin.Engine {
 	{
 		movies.GET("/", MoviesIndex)
 		movies.GET("/search", SearchMovies)
-		movies.GET("/autoscraped", AutoscrapedMovies)
 		movies.GET("/popular", PopularMovies)
 		movies.GET("/popular/genre/:genre", PopularMovies)
 		movies.GET("/popular/language/:language", PopularMovies)

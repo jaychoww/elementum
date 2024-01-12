@@ -30,8 +30,6 @@ func filterListItems(l xbmc.ListItems) xbmc.ListItems {
 	for _, i := range l {
 		if i.TraktAuth && !t {
 			continue
-		} else if !config.Get().AutoScrapeEnabled && strings.Contains(i.Path, "autoscraped") {
-			continue
 		}
 
 		ret = append(ret, i)

@@ -30,7 +30,6 @@ import (
 	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/lockfile"
 	"github.com/elgatito/elementum/repository"
-	"github.com/elgatito/elementum/scrape"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/util/ident"
@@ -207,7 +206,6 @@ func main() {
 		s.Closer.Set()
 
 		log.Infof("Shutting down with code %d ...", code)
-		scrape.Stop()
 		library.CloseLibrary()
 		s.Close(true)
 
@@ -314,7 +312,6 @@ func main() {
 	go trakt.TokenRefreshHandler()
 	go db.MaintenanceRefreshHandler()
 	go cacheDB.MaintenanceRefreshHandler()
-	go scrape.Start()
 	go util.FreeMemoryGC()
 
 	localAddress := fmt.Sprintf("%s:%d", config.Args.LocalHost, config.Args.LocalPort)

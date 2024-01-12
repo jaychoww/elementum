@@ -166,14 +166,6 @@ type Configuration struct {
 	ModifyTrackersStrategy   int
 	Scrobble                 bool
 
-	AutoScrapeEnabled        bool
-	AutoScrapeLibraryEnabled bool
-	AutoScrapeStrategy       int
-	AutoScrapeStrategyExpect int
-	AutoScrapePerHours       int
-	AutoScrapeLimitMovies    int
-	AutoScrapeInterval       int
-
 	TraktAuthorized                bool
 	TraktUsername                  string
 	TraktToken                     string
@@ -649,14 +641,6 @@ func Reload() (ret *Configuration, err error) {
 		ConnTrackerLimitAuto:        settings.ToBool("conntracker_limit_auto"),
 		SessionSave:                 settings.ToInt("session_save"),
 		Scrobble:                    settings.ToBool("trakt_scrobble"),
-
-		AutoScrapeEnabled:        settings.ToBool("autoscrape_is_enabled"),
-		AutoScrapeLibraryEnabled: settings.ToBool("autoscrape_library_enabled"),
-		AutoScrapeStrategy:       settings.ToInt("autoscrape_strategy"),
-		AutoScrapeStrategyExpect: settings.ToInt("autoscrape_strategy_expect"),
-		AutoScrapePerHours:       settings.ToInt("autoscrape_per_hours"),
-		AutoScrapeLimitMovies:    settings.ToInt("autoscrape_limit_movies"),
-		AutoScrapeInterval:       settings.ToInt("autoscrape_interval"),
 
 		TraktUsername:                  settings.ToString("trakt_username"),
 		TraktToken:                     settings.ToString("trakt_token"),
