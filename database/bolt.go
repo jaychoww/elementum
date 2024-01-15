@@ -63,7 +63,7 @@ func InitCacheDB(conf *config.Configuration) (*BoltDatabase, error) {
 
 	for _, bucket := range CacheBuckets {
 		if err = CheckBucket(cacheDatabase.db, bucket); err != nil {
-			if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 				xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 			}
 			log.Error(err)

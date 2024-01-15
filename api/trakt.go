@@ -251,11 +251,11 @@ func AddMovieToWatchlist(ctx *gin.Context) {
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
 	tmdbID := ctx.Params.ByName("tmdbId")
-	resp, err := trakt.AddToWatchlist("movies", tmdbID)
+	req, err := trakt.AddToWatchlist("movies", tmdbID)
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
-	} else if resp.Status() != 201 {
-		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+	} else if req.ResponseStatusCode != 201 {
+		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", req.ResponseStatusCode), config.AddonIcon())
 	} else {
 		xbmcHost.Notify("Elementum", "Movie added to watchlist", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.movies"))
@@ -274,11 +274,9 @@ func RemoveMovieFromWatchlist(ctx *gin.Context) {
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
 	tmdbID := ctx.Params.ByName("tmdbId")
-	resp, err := trakt.RemoveFromWatchlist("movies", tmdbID)
+	_, err := trakt.RemoveFromWatchlist("movies", tmdbID)
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
-	} else if resp.Status() != 200 {
-		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmcHost.Notify("Elementum", "Movie removed from watchlist", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.movies"))
@@ -297,11 +295,11 @@ func AddShowToWatchlist(ctx *gin.Context) {
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
 	tmdbID := ctx.Params.ByName("showId")
-	resp, err := trakt.AddToWatchlist("shows", tmdbID)
+	req, err := trakt.AddToWatchlist("shows", tmdbID)
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
-	} else if resp.Status() != 201 {
-		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed %d", resp.Status()), config.AddonIcon())
+	} else if req.ResponseStatusCode != 201 {
+		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed %d", req.ResponseStatusCode), config.AddonIcon())
 	} else {
 		xbmcHost.Notify("Elementum", "Show added to watchlist", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.shows"))
@@ -320,11 +318,9 @@ func RemoveShowFromWatchlist(ctx *gin.Context) {
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
 	tmdbID := ctx.Params.ByName("showId")
-	resp, err := trakt.RemoveFromWatchlist("shows", tmdbID)
+	_, err := trakt.RemoveFromWatchlist("shows", tmdbID)
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
-	} else if resp.Status() != 200 {
-		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmcHost.Notify("Elementum", "Show removed from watchlist", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.shows"))
@@ -343,11 +339,11 @@ func AddMovieToCollection(ctx *gin.Context) {
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
 	tmdbID := ctx.Params.ByName("tmdbId")
-	resp, err := trakt.AddToCollection("movies", tmdbID)
+	req, err := trakt.AddToCollection("movies", tmdbID)
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
-	} else if resp.Status() != 201 {
-		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+	} else if req.ResponseStatusCode != 201 {
+		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", req.ResponseStatusCode), config.AddonIcon())
 	} else {
 		xbmcHost.Notify("Elementum", "Movie added to collection", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.movies"))
@@ -366,11 +362,9 @@ func RemoveMovieFromCollection(ctx *gin.Context) {
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
 	tmdbID := ctx.Params.ByName("tmdbId")
-	resp, err := trakt.RemoveFromCollection("movies", tmdbID)
+	_, err := trakt.RemoveFromCollection("movies", tmdbID)
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
-	} else if resp.Status() != 200 {
-		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmcHost.Notify("Elementum", "Movie removed from collection", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.movies"))
@@ -389,11 +383,11 @@ func AddShowToCollection(ctx *gin.Context) {
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
 	tmdbID := ctx.Params.ByName("showId")
-	resp, err := trakt.AddToCollection("shows", tmdbID)
+	req, err := trakt.AddToCollection("shows", tmdbID)
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
-	} else if resp.Status() != 201 {
-		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+	} else if req.ResponseStatusCode != 201 {
+		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", req.ResponseStatusCode), config.AddonIcon())
 	} else {
 		xbmcHost.Notify("Elementum", "Show added to collection", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.shows"))
@@ -412,11 +406,9 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
 	tmdbID := ctx.Params.ByName("showId")
-	resp, err := trakt.RemoveFromCollection("shows", tmdbID)
+	_, err := trakt.RemoveFromCollection("shows", tmdbID)
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
-	} else if resp.Status() != 200 {
-		xbmcHost.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmcHost.Notify("Elementum", "Show removed from collection", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.shows"))

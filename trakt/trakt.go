@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/util/ident"
+	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/jmcvetta/napping"
 	"github.com/op/go-logging"
@@ -591,44 +591,18 @@ func getIntFromHeader(headers http.Header, key string) (res int) {
 	return -1
 }
 
-// Get ...
-func Get(endPoint string, params url.Values) (resp *napping.Response, err error) {
-	header := http.Header{
+func GetHeader() http.Header {
+	return http.Header{
 		"Content-type":      []string{"application/json"},
 		"trakt-api-key":     []string{config.TraktReadClientID},
 		"trakt-api-version": []string{APIVersion},
 		"User-Agent":        []string{UserAgent},
 		"Cookie":            []string{Cookies},
 	}
-
-	req := napping.Request{
-		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
-		Method: "GET",
-		Params: &params,
-		Header: &header,
-	}
-
-	rl.Call(func() error {
-		resp, err = napping.Send(&req)
-		if err != nil {
-			return err
-		} else if resp.Status() == 429 {
-			log.Warningf("Rate limit exceeded getting %s, cooling down...", endPoint)
-			rl.CoolDown(resp.HttpResponse().Header)
-			return util.ErrExceeded
-		} else if resp.Status() == 403 && retriesLeft > 0 {
-			retriesLeft--
-			resp, err = Get(endPoint, params)
-		}
-
-		return nil
-	})
-	return
 }
 
-// GetWithAuth ...
-func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, err error) {
-	header := http.Header{
+func GetAuthenticatedHeader() http.Header {
+	return http.Header{
 		"Content-type":      []string{"application/json"},
 		"Authorization":     []string{fmt.Sprintf("Bearer %s", config.Get().TraktToken)},
 		"trakt-api-key":     []string{config.TraktWriteClientID},
@@ -636,168 +610,33 @@ func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, er
 		"User-Agent":        []string{UserAgent},
 		"Cookie":            []string{Cookies},
 	}
-
-	req := napping.Request{
-		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
-		Method: "GET",
-		Params: &params,
-		Header: &header,
-	}
-
-	rl.Call(func() error {
-		resp, err = napping.Send(&req)
-
-		if err != nil {
-			return err
-		} else if resp.Status() == 401 {
-			err = fmt.Errorf("Trakt access token is not valid, please, re-authorize Trakt")
-			log.Warningf("Request: %s, Error: %s", endPoint, err)
-			if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
-				xbmcHost.Notify("Elementum", "LOCALIZE[30576]", config.AddonIcon())
-			}
-			return err
-		} else if resp.Status() == 429 {
-			log.Warningf("Rate limit exceeded getting %s, cooling down...", endPoint)
-			rl.CoolDown(resp.HttpResponse().Header)
-			return util.ErrExceeded
-		} else if resp.Status() == 403 && retriesLeft > 0 {
-			retriesLeft--
-			resp, err = GetWithAuth(endPoint, params)
-		}
-
-		return nil
-	})
-	return
 }
 
-// PostJSON ...
-func PostJSON(endPoint string, obj interface{}) (resp *napping.Response, err error) {
-	b, err := json.Marshal(obj)
-	if err != nil {
-		fmt.Println(err)
-		return
+func GetAvailableHeader() http.Header {
+	if config.Get().TraktAuthorized {
+		return GetAuthenticatedHeader()
 	}
-
-	return Post(endPoint, bytes.NewBuffer(b))
-}
-
-// Post ...
-func Post(endPoint string, payload *bytes.Buffer) (resp *napping.Response, err error) {
-	header := http.Header{
-		"Content-type":      []string{"application/json"},
-		"Authorization":     []string{fmt.Sprintf("Bearer %s", config.Get().TraktToken)},
-		"trakt-api-key":     []string{config.TraktWriteClientID},
-		"trakt-api-version": []string{APIVersion},
-		"User-Agent":        []string{UserAgent},
-		"Cookie":            []string{Cookies},
-	}
-
-	req := napping.Request{
-		Url:        fmt.Sprintf("%s/%s", APIURL, endPoint),
-		Method:     "POST",
-		RawPayload: true,
-		Payload:    payload,
-		Header:     &header,
-	}
-
-	rl.Call(func() error {
-		resp, err = napping.Send(&req)
-		if err != nil {
-			return err
-		} else if resp.Status() == 429 {
-			log.Warningf("Rate limit exceeded getting %s, cooling down...", endPoint)
-			rl.CoolDown(resp.HttpResponse().Header)
-			return util.ErrExceeded
-		} else if resp.Status() == 403 && retriesLeft > 0 {
-			retriesLeft--
-			resp, err = Post(endPoint, payload)
-		}
-
-		return nil
-	})
-	return
+	return GetHeader()
 }
 
 // GetCode ...
 func GetCode() (code *Code, err error) {
-	endPoint := "oauth/device/code"
-	header := http.Header{
-		"Content-type": []string{"application/json"},
-		"User-Agent":   []string{UserAgent},
-		"Cookie":       []string{Cookies},
-	}
-	params := napping.Params{
-		"client_id": config.TraktWriteClientID,
-	}.AsUrlValues()
-
-	req := napping.Request{
-		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
+	req := reqapi.Request{
+		API:    reqapi.TraktAPI,
 		Method: "POST",
-		Params: &params,
-		Header: &header,
+		URL:    "oauth/device/code",
+		Header: http.Header{
+			"Content-type": []string{"application/json"},
+			"User-Agent":   []string{UserAgent},
+			"Cookie":       []string{Cookies},
+		},
+		Params: napping.Params{
+			"client_id": config.TraktWriteClientID,
+		}.AsUrlValues(),
+		Result: &code,
 	}
 
-	var resp *napping.Response
-	rl.Call(func() error {
-		resp, err = napping.Send(&req)
-		if err != nil {
-			err = resp.Unmarshal(&code)
-			return err
-		} else if resp.Status() == 429 {
-			log.Warningf("Rate limit exceeded getting Trakt code %s, cooling down...", code)
-			rl.CoolDown(resp.HttpResponse().Header)
-			return util.ErrExceeded
-		} else if resp.Status() == 403 && retriesLeft > 0 {
-			retriesLeft--
-			code, err = GetCode()
-		} else {
-			resp.Unmarshal(&code)
-		}
-
-		return nil
-	})
-	if err == nil && resp.Status() != 200 {
-		err = fmt.Errorf("Unable to get Trakt code: %d", resp.Status())
-	}
-	return
-}
-
-// GetToken ...
-func GetToken(code string) (resp *napping.Response, err error) {
-	endPoint := "oauth/device/token"
-	header := http.Header{
-		"Content-type": []string{"application/json"},
-		"User-Agent":   []string{UserAgent},
-		"Cookie":       []string{Cookies},
-	}
-	params := napping.Params{
-		"code":          code,
-		"client_id":     config.TraktWriteClientID,
-		"client_secret": config.TraktWriteClientSecret,
-	}.AsUrlValues()
-
-	req := napping.Request{
-		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
-		Method: "POST",
-		Params: &params,
-		Header: &header,
-	}
-
-	rl.Call(func() error {
-		resp, err = napping.Send(&req)
-		if err != nil {
-			return err
-		} else if resp.Status() == 429 {
-			log.Warningf("Rate limit exceeded getting Trakt token with code %s, cooling down...", code)
-			rl.CoolDown(resp.HttpResponse().Header)
-			return util.ErrExceeded
-		} else if resp.Status() == 403 && retriesLeft > 0 {
-			retriesLeft--
-			resp, err = GetToken(code)
-		}
-
-		return nil
-	})
+	err = req.Do()
 	return
 }
 
@@ -812,28 +651,45 @@ func PollToken(code *Code) (token *Token, err error) {
 	for {
 		select {
 		case <-interval.C:
-			resp, errGet := GetToken(code.DeviceCode)
-			if errGet != nil {
-				return nil, errGet
+			req := reqapi.Request{
+				API:    reqapi.TraktAPI,
+				Method: "POST",
+				URL:    "oauth/device/token",
+				Header: http.Header{
+					"Content-type": []string{"application/json"},
+					"User-Agent":   []string{UserAgent},
+					"Cookie":       []string{Cookies},
+				},
+				Params: napping.Params{
+					"code":          code.DeviceCode,
+					"client_id":     config.TraktWriteClientID,
+					"client_secret": config.TraktWriteClientSecret,
+				}.AsUrlValues(),
+				Result: &token,
 			}
-			if resp.Status() == 200 {
-				resp.Unmarshal(&token)
+
+			req.Do()
+			// if errGet := req.Do(); errGet != nil {
+			// 	return nil, errGet
+			// }
+
+			if req.ResponseStatusCode == 200 {
 				return token, err
-			} else if resp.Status() == 400 {
+			} else if req.ResponseStatusCode == 400 {
 				break
-			} else if resp.Status() == 404 {
+			} else if req.ResponseStatusCode == 404 {
 				err = errors.New("Invalid device code")
 				return nil, err
-			} else if resp.Status() == 409 {
+			} else if req.ResponseStatusCode == 409 {
 				err = errors.New("Code already used")
 				return nil, err
-			} else if resp.Status() == 410 {
+			} else if req.ResponseStatusCode == 410 {
 				err = errors.New("Code expired")
 				return nil, err
-			} else if resp.Status() == 418 {
+			} else if req.ResponseStatusCode == 418 {
 				err = errors.New("Code denied")
 				return nil, err
-			} else if resp.Status() == 429 {
+			} else if req.ResponseStatusCode == 429 {
 				// err = errors.New("Polling too quickly.")
 				interval.Stop()
 				interval = time.NewTicker(time.Duration(startInterval+5) * time.Second)
@@ -845,39 +701,6 @@ func PollToken(code *Code) (token *Token, err error) {
 			return nil, err
 		}
 	}
-}
-
-// RefreshToken ...
-func RefreshToken() (resp *napping.Response, err error) {
-	endPoint := "oauth/token"
-	header := http.Header{
-		"Content-type": []string{"application/json"},
-		"User-Agent":   []string{UserAgent},
-		"Cookie":       []string{Cookies},
-	}
-	params := napping.Params{
-		"refresh_token": config.Get().TraktRefreshToken,
-		"client_id":     config.TraktWriteClientID,
-		"client_secret": config.TraktWriteClientSecret,
-		"redirect_uri":  "urn:ietf:wg:oauth:2.0:oob",
-		"grant_type":    "refresh_token",
-	}.AsUrlValues()
-
-	req := napping.Request{
-		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
-		Method: "POST",
-		Params: &params,
-		Header: &header,
-	}
-
-	resp, err = napping.Send(&req)
-	if err != nil {
-		return
-	} else if resp.Status() == 403 && retriesLeft > 0 {
-		retriesLeft--
-		resp, err = RefreshToken()
-	}
-	return
 }
 
 // TokenRefreshHandler ...
@@ -897,36 +720,42 @@ func TokenRefreshHandler() {
 			return
 		case <-ticker.C:
 			if time.Now().Unix() > int64(config.Get().TraktTokenExpiry)-int64(259200) {
-				resp, err := RefreshToken()
+				req := reqapi.Request{
+					API:    reqapi.TraktAPI,
+					Method: "POST",
+					URL:    "oauth/token",
+					Header: http.Header{
+						"Content-type": []string{"application/json"},
+						"User-Agent":   []string{UserAgent},
+						"Cookie":       []string{Cookies},
+					},
+					Params: napping.Params{
+						"refresh_token": config.Get().TraktRefreshToken,
+						"client_id":     config.TraktWriteClientID,
+						"client_secret": config.TraktWriteClientSecret,
+						"redirect_uri":  "urn:ietf:wg:oauth:2.0:oob",
+						"grant_type":    "refresh_token",
+					}.AsUrlValues(),
+					Result: &token,
+				}
+
+				err := req.Do()
 				if err != nil {
-					if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+					if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 						xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 					}
 					log.Error(err)
 					return
 				}
 
-				if resp.Status() == 200 {
-					if errUnm := resp.Unmarshal(&token); errUnm != nil {
-						if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
-							xbmcHost.Notify("Elementum", errUnm.Error(), config.AddonIcon())
-						}
-						log.Error(errUnm)
-					} else {
-						expiry := time.Now().Unix() + int64(token.ExpiresIn)
-						if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
-							xbmcHost.SetSetting("trakt_token_expiry", strconv.Itoa(int(expiry)))
-							xbmcHost.SetSetting("trakt_token", token.AccessToken)
-							xbmcHost.SetSetting("trakt_refresh_token", token.RefreshToken)
-						}
-						log.Noticef("Token refreshed for Trakt authorization, next refresh in %s", time.Duration(token.ExpiresIn-259200)*time.Second)
+				if req.ResponseStatusCode == 200 {
+					expiry := time.Now().Unix() + int64(token.ExpiresIn)
+					if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+						xbmcHost.SetSetting("trakt_token_expiry", strconv.Itoa(int(expiry)))
+						xbmcHost.SetSetting("trakt_token", token.AccessToken)
+						xbmcHost.SetSetting("trakt_refresh_token", token.RefreshToken)
 					}
-				} else {
-					err = fmt.Errorf("Bad status while refreshing Trakt token: %d", resp.Status())
-					if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
-						xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
-					}
-					log.Error(err)
+					log.Noticef("Token refreshed for Trakt authorization, next refresh in %s", time.Duration(token.ExpiresIn-259200)*time.Second)
 				}
 			}
 		}
@@ -938,7 +767,7 @@ func Authorize(fromSettings bool) error {
 	code, err := GetCode()
 	if err != nil {
 		log.Error("Could not get authorization code from Trakt.tv: %s", err)
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 			xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 		}
 		return err
@@ -962,7 +791,7 @@ func Authorize(fromSettings bool) error {
 				attempts++
 
 				if attempts > 30 {
-					if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+					if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 						xbmcHost.Notify("Elementum", "LOCALIZE[30651]", config.AddonIcon())
 					}
 					return
@@ -980,7 +809,7 @@ func Authorize(fromSettings bool) error {
 				_ = cacheStore.Set(cache.TraktActivitiesKey, "", 1)
 
 				expiry := time.Now().Unix() + int64(token.ExpiresIn)
-				if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+				if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 					xbmcHost.SetSetting("trakt_token_expiry", strconv.Itoa(int(expiry)))
 					xbmcHost.SetSetting("trakt_token", token.AccessToken)
 					xbmcHost.SetSetting("trakt_refresh_token", token.RefreshToken)
@@ -989,29 +818,28 @@ func Authorize(fromSettings bool) error {
 				config.Get().TraktToken = token.AccessToken
 
 				// Getting username for currently authorized user
-				params := napping.Params{}.AsUrlValues()
-				resp, err := GetWithAuth("users/settings", params)
-				if err != nil {
+				user := &UserSettings{}
+				req := reqapi.Request{
+					API:    reqapi.TraktAPI,
+					URL:    "users/settings",
+					Header: GetAuthenticatedHeader(),
+					Params: napping.Params{}.AsUrlValues(),
+					Result: &user,
+				}
+
+				if err = req.Do(); err != nil {
 					return
 				}
-				if resp.Status() == 200 {
-					user := &UserSettings{}
-					errJSON := resp.Unmarshal(user)
-					if errJSON != nil {
-						return
-					}
-
-					if user != nil && user.User.Ids.Slug != "" {
-						log.Debugf("Setting Trakt Username as %s", user.User.Ids.Slug)
-						if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
-							xbmcHost.SetSetting("trakt_username", user.User.Ids.Slug)
-						}
+				if req.ResponseStatusCode == 200 && user != nil && user.User.Ids.Slug != "" {
+					log.Debugf("Setting Trakt Username as %s", user.User.Ids.Slug)
+					if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+						xbmcHost.SetSetting("trakt_username", user.User.Ids.Slug)
 					}
 				}
 
 				config.Reload()
 
-				if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+				if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 					xbmcHost.Notify("Elementum", "LOCALIZE[30650]", config.AddonIcon())
 				}
 				return
@@ -1019,7 +847,7 @@ func Authorize(fromSettings bool) error {
 		}
 	}(code)
 
-	if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+	if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 		if !xbmcHost.Dialog(xbmcHost.GetLocalizedString(30646), fmt.Sprintf(xbmcHost.GetLocalizedString(30649), code.VerificationURL, code.UserCode)) {
 			return errors.New("Authentication canceled")
 		}
@@ -1034,7 +862,7 @@ func Deauthorize(fromSettings bool) error {
 	cacheStore := cache.NewDBStore()
 	_ = cacheStore.Set(cache.TraktActivitiesKey, "", 1)
 
-	if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+	if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 		xbmcHost.SetSetting("trakt_token_expiry", "")
 		xbmcHost.SetSetting("trakt_token", "")
 		xbmcHost.SetSetting("trakt_refresh_token", "")
@@ -1072,23 +900,20 @@ func Request(endPoint string, params napping.Params, isWithAuth bool, isUpdateNe
 		}
 	}
 
-	var err error
-	var resp *napping.Response
-
+	header := GetHeader()
 	if isWithAuth {
-		resp, err = GetWithAuth(endPoint, params.AsUrlValues())
-	} else {
-		resp, err = Get(endPoint, params.AsUrlValues())
+		header = GetAuthenticatedHeader()
 	}
 
-	if err != nil {
-		return err
-	} else if resp.Status() != 200 {
-		return fmt.Errorf("Bad status getting %s: %d", endPoint, resp.Status())
+	req := reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    endPoint,
+		Header: header,
+		Params: params.AsUrlValues(),
+		Result: &ret,
 	}
 
-	if err := resp.Unmarshal(&ret); err != nil {
-		log.Warningf("Cannot unmarshal response: %s", err)
+	if err := req.Do(); err != nil {
 		return err
 	}
 
@@ -1097,7 +922,7 @@ func Request(endPoint string, params napping.Params, isWithAuth bool, isUpdateNe
 }
 
 // SyncAddedItem adds item (movie/show) to watchlist or collection
-func SyncAddedItem(itemType string, tmdbID string, location int) (resp *napping.Response, err error) {
+func SyncAddedItem(itemType string, tmdbID string, location int) (req *reqapi.Request, err error) {
 	list := config.Get().TraktSyncAddedMoviesList
 	if itemType == "shows" {
 		list = config.Get().TraktSyncAddedShowsList
@@ -1115,7 +940,7 @@ func SyncAddedItem(itemType string, tmdbID string, location int) (resp *napping.
 }
 
 // SyncRemovedItem removes item (movie/show) from watchlist or collection
-func SyncRemovedItem(itemType string, tmdbID string, location int) (resp *napping.Response, err error) {
+func SyncRemovedItem(itemType string, tmdbID string, location int) (req *reqapi.Request, err error) {
 	list := config.Get().TraktSyncRemovedMoviesList
 	if itemType == "shows" {
 		list = config.Get().TraktSyncRemovedShowsList
@@ -1133,17 +958,25 @@ func SyncRemovedItem(itemType string, tmdbID string, location int) (resp *nappin
 }
 
 // AddToWatchlist ...
-func AddToWatchlist(itemType string, tmdbID string) (resp *napping.Response, err error) {
+func AddToWatchlist(itemType string, tmdbID string) (req *reqapi.Request, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
 
-	endPoint := "sync/watchlist"
-	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
+	req = &reqapi.Request{
+		API:     reqapi.TraktAPI,
+		Method:  "POST",
+		URL:     "sync/watchlist",
+		Header:  GetAuthenticatedHeader(),
+		Params:  napping.Params{}.AsUrlValues(),
+		Payload: bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+	}
+
+	return req, req.Do()
 }
 
 // AddToUserlist ...
-func AddToUserlist(listID int, itemType string, tmdbID string) (resp *napping.Response, err error) {
+func AddToUserlist(listID int, itemType string, tmdbID string) (req *reqapi.Request, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
@@ -1161,11 +994,21 @@ func AddToUserlist(listID int, itemType string, tmdbID string) (resp *napping.Re
 		payload.Shows = append(payload.Shows, i)
 	}
 
-	return PostJSON(endPoint, payload)
+	payloadJSON, _ := json.Marshal(payload)
+	req = &reqapi.Request{
+		API:     reqapi.TraktAPI,
+		Method:  "POST",
+		URL:     endPoint,
+		Header:  GetAuthenticatedHeader(),
+		Params:  napping.Params{}.AsUrlValues(),
+		Payload: bytes.NewBuffer(payloadJSON),
+	}
+
+	return req, req.Do()
 }
 
 // RemoveFromUserlist ...
-func RemoveFromUserlist(listID int, itemType string, tmdbID string) (resp *napping.Response, err error) {
+func RemoveFromUserlist(listID int, itemType string, tmdbID string) (req *reqapi.Request, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
@@ -1183,41 +1026,75 @@ func RemoveFromUserlist(listID int, itemType string, tmdbID string) (resp *nappi
 		payload.Shows = append(payload.Shows, i)
 	}
 
-	return PostJSON(endPoint, payload)
+	payloadJSON, _ := json.Marshal(payload)
+	req = &reqapi.Request{
+		API:     reqapi.TraktAPI,
+		Method:  "POST",
+		URL:     endPoint,
+		Header:  GetAuthenticatedHeader(),
+		Params:  napping.Params{}.AsUrlValues(),
+		Payload: bytes.NewBuffer(payloadJSON),
+	}
+
+	return req, req.Do()
 }
 
 // RemoveFromWatchlist ...
-func RemoveFromWatchlist(itemType string, tmdbID string) (resp *napping.Response, err error) {
+func RemoveFromWatchlist(itemType string, tmdbID string) (req *reqapi.Request, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
 
-	endPoint := "sync/watchlist/remove"
-	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
+	req = &reqapi.Request{
+		API:     reqapi.TraktAPI,
+		Method:  "POST",
+		URL:     "sync/watchlist/remove",
+		Header:  GetAuthenticatedHeader(),
+		Params:  napping.Params{}.AsUrlValues(),
+		Payload: bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+	}
+
+	return req, req.Do()
 }
 
 // AddToCollection ...
-func AddToCollection(itemType string, tmdbID string) (resp *napping.Response, err error) {
+func AddToCollection(itemType string, tmdbID string) (req *reqapi.Request, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
 
-	endPoint := "sync/collection"
-	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
+	req = &reqapi.Request{
+		API:     reqapi.TraktAPI,
+		Method:  "POST",
+		URL:     "sync/collection",
+		Header:  GetAuthenticatedHeader(),
+		Params:  napping.Params{}.AsUrlValues(),
+		Payload: bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+	}
+
+	return req, req.Do()
 }
 
 // RemoveFromCollection ...
-func RemoveFromCollection(itemType string, tmdbID string) (resp *napping.Response, err error) {
+func RemoveFromCollection(itemType string, tmdbID string) (req *reqapi.Request, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
 
-	endPoint := "sync/collection/remove"
-	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
+	req = &reqapi.Request{
+		API:     reqapi.TraktAPI,
+		Method:  "POST",
+		URL:     "sync/collection/remove",
+		Header:  GetAuthenticatedHeader(),
+		Params:  napping.Params{}.AsUrlValues(),
+		Payload: bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+	}
+
+	return req, req.Do()
 }
 
 // SetWatched addes and removes from watched history
-func SetWatched(item *WatchedItem) (resp *napping.Response, err error) {
+func SetWatched(item *WatchedItem) (req *reqapi.Request, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
@@ -1234,7 +1111,16 @@ func SetWatched(item *WatchedItem) (resp *napping.Response, err error) {
 		endPoint = "sync/history/remove"
 	}
 
-	return Post(endPoint, bytes.NewBufferString(pre+query+post))
+	req = &reqapi.Request{
+		API:     reqapi.TraktAPI,
+		Method:  "POST",
+		URL:     endPoint,
+		Header:  GetAuthenticatedHeader(),
+		Params:  napping.Params{}.AsUrlValues(),
+		Payload: bytes.NewBufferString(pre + query + post),
+	}
+
+	return req, req.Do()
 }
 
 // SetMultipleWatched adds and removes from watched history
@@ -1267,19 +1153,21 @@ func SetMultipleWatched(items []*WatchedItem) (*HistoryResponse, error) {
 
 	log.Debugf("Setting watch state at %s for %d %s items", endPoint, len(items), items[0].MediaType)
 
-	resp, err := Post(endPoint, bytes.NewBufferString(pre+query+post))
+	stats := HistoryResponse{}
+	req := &reqapi.Request{
+		API:     reqapi.TraktAPI,
+		Method:  "POST",
+		URL:     endPoint,
+		Header:  GetAuthenticatedHeader(),
+		Params:  napping.Params{}.AsUrlValues(),
+		Payload: bytes.NewBufferString(pre + query + post),
+		Result:  &stats,
+	}
 
+	err := req.Do()
 	if err != nil {
 		log.Warningf("Error getting watched items: %s", err)
 		return nil, err
-	} else if resp.Status() != 200 && resp.Status() != 201 {
-		log.Warningf("Error getting watched items. Status: %d", resp.Status())
-		return nil, fmt.Errorf("Bad status setting Trakt watched items: %d", resp.Status())
-	}
-
-	stats := HistoryResponse{}
-	if err = resp.Unmarshal(&stats); err != nil {
-		log.Warning(err)
 	} else {
 		log.Infof("Statistics for watch state at %s for %d %s items: Added: %#v, Deleted: %#v", endPoint, len(items), items[0].MediaType, stats.Added, stats.Deleted)
 	}
@@ -1344,41 +1232,48 @@ func Scrobble(action string, contentType string, tmdbID int, watched float64, ru
 	endPoint := fmt.Sprintf("scrobble/%s", action)
 	payload := fmt.Sprintf(`{"%s": {"ids": {"tmdb": %d}}, "progress": %f, "app_version": "%s"}`,
 		contentType, tmdbID, progress, ident.GetVersion())
-	resp, err := Post(endPoint, bytes.NewBufferString(payload))
-	if err != nil {
+
+	req := &reqapi.Request{
+		API:     reqapi.TraktAPI,
+		Method:  "POST",
+		URL:     endPoint,
+		Header:  GetAuthenticatedHeader(),
+		Params:  napping.Params{}.AsUrlValues(),
+		Payload: bytes.NewBufferString(payload),
+	}
+
+	if err := req.Do(); err != nil {
 		log.Error(err.Error())
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 			xbmcHost.Notify("Elementum", "Scrobble failed, check your logs.", config.AddonIcon())
 		}
-	} else if resp.Status() != 201 {
-		log.Errorf("Failed to scrobble %s #%d to %s at %f: %d", contentType, tmdbID, action, progress, resp.Status())
+	} else if req.ResponseStatusCode != 201 {
+		log.Errorf("Failed to scrobble %s #%d to %s at %f: %d", contentType, tmdbID, action, progress, req.ResponseStatusCode)
 	}
 }
 
 // GetLastActivities ...
-func GetLastActivities() (a *UserActivities, err error) {
+func GetLastActivities() (ret *UserActivities, err error) {
 	if err := Authorized(); err != nil {
 		return nil, fmt.Errorf("Not authorized")
 	}
 
-	endPoint := "sync/last_activities"
+	req := &reqapi.Request{
+		API:         reqapi.TraktAPI,
+		URL:         "sync/last_activities",
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &ret,
+		Description: "Last Activities",
+	}
 
-	params := napping.Params{}.AsUrlValues()
-	resp, err := GetWithAuth(endPoint, params)
-
-	if err != nil {
+	if err = req.Do(); err != nil && req.ResponseStatusCode != 423 {
 		return nil, err
-	} else if resp.Status() == 423 {
+	} else if req.ResponseStatusCode == 423 {
 		return nil, ErrLocked
-	} else if resp.Status() != 200 {
-		return nil, fmt.Errorf("Bad status getting Trakt activities: %d", resp.Status())
 	}
 
-	if err := resp.Unmarshal(&a); err != nil {
-		log.Warning(err)
-	} else {
-		config.Get().TraktAuthorized = true
-	}
+	config.Get().TraktAuthorized = true
 
 	return
 }
@@ -1514,7 +1409,7 @@ func NotifyLocked() {
 
 	cacheStore.Set(cache.TraktLockedAccountKey, checked, cache.TraktLockedAccountExpire)
 
-	if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+	if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 		xbmcHost.Dialog("LOCALIZE[30616]", "LOCALIZE[30617]")
 	}
 }

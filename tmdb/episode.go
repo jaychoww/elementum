@@ -8,14 +8,15 @@ import (
 	"time"
 
 	"github.com/anacrolix/missinggo/perf"
+	"github.com/jmcvetta/napping"
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/library/playcount"
 	"github.com/elgatito/elementum/library/uid"
 	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
-	"github.com/jmcvetta/napping"
 )
 
 // GetEpisode ...
@@ -26,8 +27,9 @@ func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TMDBEpisodeKey, showID, seasonNumber, episodeNumber, language)
 	if err := cacheStore.Get(key, &episode); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/tv/%d/season/%d/episode/%d", tmdbEndpoint, showID, seasonNumber, episodeNumber),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: fmt.Sprintf("/tv/%d/season/%d/episode/%d", showID, seasonNumber, episodeNumber),
 			Params: napping.Params{
 				"api_key":                apiKey,
 				"append_to_response":     "credits,images,videos,alternative_titles,translations,external_ids,trailers",
@@ -37,9 +39,9 @@ func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string
 			}.AsUrlValues(),
 			Result:      &episode,
 			Description: "episode",
-		})
+		}
 
-		if err == nil && episode != nil {
+		if err = req.Do(); err == nil && episode != nil {
 			cacheStore.Set(key, episode, cache.TMDBEpisodeExpire)
 		}
 	}

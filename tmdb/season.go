@@ -13,6 +13,7 @@ import (
 	"github.com/elgatito/elementum/library/playcount"
 	"github.com/elgatito/elementum/library/uid"
 	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
 
 	"github.com/anacrolix/missinggo/perf"
@@ -48,8 +49,9 @@ func GetSeason(showID int, seasonNumber int, language string, seasonsCount int, 
 	}
 
 	if err := cacheStore.Get(key, &season); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/tv/%d/season/%d", tmdbEndpoint, showID, seasonNumber),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: fmt.Sprintf("/tv/%d/season/%d", showID, seasonNumber),
 			Params: napping.Params{
 				"api_key":                apiKey,
 				"append_to_response":     "credits,images,videos,external_ids,alternative_titles,translations,trailers",
@@ -59,11 +61,12 @@ func GetSeason(showID int, seasonNumber int, language string, seasonsCount int, 
 			}.AsUrlValues(),
 			Result:      &season,
 			Description: "season",
-		})
+		}
 
-		if season == nil && err != nil && err == util.ErrNotFound {
+		if err = req.Do(); season == nil && err != nil && err == util.ErrNotFound {
 			cacheStore.Set(key, &season, cache.TMDBSeasonExpire)
 		}
+
 		if season == nil {
 			return nil
 		}

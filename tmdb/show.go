@@ -16,6 +16,7 @@ import (
 	"github.com/elgatito/elementum/library/uid"
 	"github.com/elgatito/elementum/tvdb"
 	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
 
 	"github.com/anacrolix/missinggo/perf"
@@ -39,8 +40,9 @@ func GetShowImages(showID int) *Images {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TMDBShowImagesKey, showID)
 	if err := cacheStore.Get(key, &images); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/tv/%d/images", tmdbEndpoint, showID),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: fmt.Sprintf("/tv/%d/images", showID),
 			Params: napping.Params{
 				"api_key":                apiKey,
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
@@ -48,9 +50,9 @@ func GetShowImages(showID int) *Images {
 			}.AsUrlValues(),
 			Result:      &images,
 			Description: "show images",
-		})
+		}
 
-		if err == nil && images != nil {
+		if err = req.Do(); err == nil && images != nil {
 			cacheStore.Set(key, images, cache.TMDBShowImagesExpire)
 		}
 	}
@@ -65,8 +67,9 @@ func GetSeasonImages(showID int, season int) *Images {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TMDBSeasonImagesKey, showID, season)
 	if err := cacheStore.Get(key, &images); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/tv/%d/season/%d/images", tmdbEndpoint, showID, season),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: fmt.Sprintf("/tv/%d/season/%d/images", showID, season),
 			Params: napping.Params{
 				"api_key":                apiKey,
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
@@ -74,9 +77,9 @@ func GetSeasonImages(showID int, season int) *Images {
 			}.AsUrlValues(),
 			Result:      &images,
 			Description: "season images",
-		})
+		}
 
-		if err == nil && images != nil {
+		if err = req.Do(); err == nil && images != nil {
 			cacheStore.Set(key, images, cache.TMDBSeasonImagesExpire)
 		}
 	}
@@ -91,8 +94,9 @@ func GetEpisodeImages(showID, season, episode int) *Images {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TMDBEpisodeImagesKey, showID, season, episode)
 	if err := cacheStore.Get(key, &images); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/tv/%d/season/%d/episode/%d/images", tmdbEndpoint, showID, season, episode),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: fmt.Sprintf("/tv/%d/season/%d/episode/%d/images", showID, season, episode),
 			Params: napping.Params{
 				"api_key":                apiKey,
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
@@ -100,9 +104,9 @@ func GetEpisodeImages(showID, season, episode int) *Images {
 			}.AsUrlValues(),
 			Result:      &images,
 			Description: "season images",
-		})
+		}
 
-		if err == nil && images != nil {
+		if err = req.Do(); err == nil && images != nil {
 			cacheStore.Set(key, images, cache.TMDBEpisodeImagesExpire)
 		}
 	}
@@ -126,8 +130,9 @@ func GetShow(showID int, language string) (show *Show) {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TMDBShowByIDKey, showID, language)
 	if err := cacheStore.Get(key, &show); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/tv/%d", tmdbEndpoint, showID),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: fmt.Sprintf("/tv/%d", showID),
 			Params: napping.Params{
 				"api_key":                apiKey,
 				"append_to_response":     "credits,images,alternative_titles,translations,external_ids,content_ratings",
@@ -137,9 +142,9 @@ func GetShow(showID int, language string) (show *Show) {
 			}.AsUrlValues(),
 			Result:      &show,
 			Description: "show",
-		})
+		}
 
-		if show == nil && err != nil && err == util.ErrNotFound {
+		if err = req.Do(); show == nil && err != nil && err == util.ErrNotFound {
 			cacheStore.Set(key, &show, cache.TMDBShowByIDExpire)
 		}
 		if show == nil {
@@ -188,8 +193,9 @@ func GetShows(showIds []int, language string) Shows {
 // SearchShows ...
 func SearchShows(query string, language string, page int) (Shows, int) {
 	var results EntityList
-	MakeRequest(APIRequest{
-		URL: fmt.Sprintf("%s/search/tv", tmdbEndpoint),
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: "/search/tv",
 		Params: napping.Params{
 			"api_key": apiKey,
 			"query":   query,
@@ -197,9 +203,9 @@ func SearchShows(query string, language string, page int) (Shows, int) {
 		}.AsUrlValues(),
 		Result:      &results,
 		Description: "search show",
-	})
+	}
 
-	if results.Results != nil && len(results.Results) == 0 {
+	if err := req.Do(); err != nil || (results.Results != nil && len(results.Results) == 0) {
 		return nil, 0
 	}
 
@@ -255,14 +261,15 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 					pageParams[k] = v
 				}
 
-				err = MakeRequest(APIRequest{
-					URL:         fmt.Sprintf("%s/%s", tmdbEndpoint, endpoint),
+				req := reqapi.Request{
+					API:         reqapi.TMDBAPI,
+					URL:         fmt.Sprintf("/%s", endpoint),
 					Params:      pageParams.AsUrlValues(),
 					Result:      &results,
 					Description: "list shows",
-				})
+				}
 
-				if results == nil {
+				if err = req.Do(); err != nil || results == nil {
 					return
 				}
 
@@ -426,28 +433,32 @@ func GetTVGenres(language string) []*Genre {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TMDBShowGenresKey, language)
 	if err := cacheStore.Get(key, &genres); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/genre/tv/list", tmdbEndpoint),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: "/genre/tv/list",
 			Params: napping.Params{
 				"api_key":  apiKey,
 				"language": language,
 			}.AsUrlValues(),
 			Result:      &genres,
 			Description: "show genres",
-		})
+		}
 
 		// That is a special case, when language in on TMDB, but it results empty names.
 		//   example of this: Catalan language.
-		if err == nil && genres.Genres != nil && len(genres.Genres) > 0 && genres.Genres[0].Name == "" {
-			err = MakeRequest(APIRequest{
-				URL: fmt.Sprintf("%s/genre/tv/list", tmdbEndpoint),
+		if err = req.Do(); err == nil && genres.Genres != nil && len(genres.Genres) > 0 && genres.Genres[0].Name == "" {
+			req = reqapi.Request{
+				API: reqapi.TMDBAPI,
+				URL: "/genre/tv/list",
 				Params: napping.Params{
 					"api_key":  apiKey,
 					"language": "en-US",
 				}.AsUrlValues(),
 				Result:      &genres,
 				Description: "show genres",
-			})
+			}
+
+			err = req.Do()
 		}
 
 		if err == nil && genres.Genres != nil && len(genres.Genres) > 0 {

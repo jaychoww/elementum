@@ -3,13 +3,11 @@ package fanart
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
-	"time"
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
-	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
 
 	"github.com/anacrolix/missinggo/perf"
@@ -20,8 +18,6 @@ import (
 //go:generate msgp -o msgp.go -io=false -tests=false
 
 const (
-	// APIURL ...
-	APIURL = "http://webservice.fanart.tv"
 	// ClientID ...
 	ClientID = "decb307ca800170b833c3061863974f3"
 	// APIVersion ...
@@ -29,15 +25,6 @@ const (
 )
 
 var log = logging.MustGetLogger("fanart")
-
-var (
-	retriesLeft             = 3
-	burstRate               = 50
-	burstTime               = 10 * time.Second
-	simultaneousConnections = 25
-)
-
-var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
 
 // Movie ...
 type Movie struct {
@@ -95,36 +82,12 @@ type Disk struct {
 	DiscType string `json:"disc_type"`
 }
 
-// Get ...
-func Get(endPoint string, params url.Values) (resp *napping.Response, err error) {
-	header := http.Header{
+func GetHeader() http.Header {
+	return http.Header{
 		"Content-type": []string{"application/json"},
 		"api-key":      []string{ClientID},
 		"api-version":  []string{APIVersion},
 	}
-
-	req := napping.Request{
-		Url:    fmt.Sprintf("%s/%s/%s", APIURL, APIVersion, endPoint),
-		Method: "GET",
-		Params: &params,
-		Header: &header,
-	}
-
-	rl.Call(func() error {
-		resp, err = napping.Send(&req)
-		if err != nil {
-			return err
-		} else if resp.Status() == 429 {
-			log.Warningf("Rate limit exceeded getting %s, cooling down...", endPoint)
-			rl.CoolDown(resp.HttpResponse().Header)
-			return util.ErrExceeded
-		} else if resp.Status() == 403 && retriesLeft > 0 {
-			resp, err = Get(endPoint, params)
-		}
-
-		return nil
-	})
-	return
 }
 
 // GetMovie ...
@@ -135,20 +98,19 @@ func GetMovie(tmdbID int) (movie *Movie) {
 
 	defer perf.ScopeTimer()()
 
-	endPoint := fmt.Sprintf("movies/%d", tmdbID)
-	params := napping.Params{}.AsUrlValues()
-
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.FanartMovieByIDKey, tmdbID)
 	if err := cacheStore.Get(key, &movie); err != nil {
-		resp, err := Get(endPoint, params)
-		if err != nil {
-			log.Debugf("Error getting fanart for movie (%d): %#v", tmdbID, err)
-			return
+		req := reqapi.Request{
+			API:    reqapi.FanartAPI,
+			URL:    fmt.Sprintf("/movies/%d", tmdbID),
+			Header: GetHeader(),
+			Params: napping.Params{}.AsUrlValues(),
+			Result: &movie,
 		}
 
-		if err := resp.Unmarshal(&movie); err != nil {
-			log.Warningf("Unmarshal error for movie (%d): %#v", tmdbID, err)
+		if err = req.Do(); err != nil {
+			log.Debugf("Error getting fanart for movie (%d): %#v", tmdbID, err)
 			return
 		}
 
@@ -166,20 +128,19 @@ func GetShow(tvdbID int) (show *Show) {
 
 	defer perf.ScopeTimer()()
 
-	endPoint := fmt.Sprintf("tv/%d", tvdbID)
-	params := napping.Params{}.AsUrlValues()
-
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.FanartShowByIDKey, tvdbID)
 	if err := cacheStore.Get(key, &show); err != nil {
-		resp, err := Get(endPoint, params)
-		if err != nil {
-			log.Debugf("Error getting fanart for show (%d): %#v", tvdbID, err)
-			return
+		req := reqapi.Request{
+			API:    reqapi.FanartAPI,
+			URL:    fmt.Sprintf("/tv/%d", tvdbID),
+			Header: GetHeader(),
+			Params: napping.Params{}.AsUrlValues(),
+			Result: &show,
 		}
 
-		if err := resp.Unmarshal(&show); err != nil {
-			log.Warningf("Unmarshal error for show (%d): %#v", tvdbID, err)
+		if err = req.Do(); err != nil {
+			log.Debugf("Error getting fanart for show (%d): %#v", tvdbID, err)
 			return
 		}
 

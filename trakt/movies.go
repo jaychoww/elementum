@@ -14,6 +14,7 @@ import (
 	"github.com/elgatito/elementum/library/uid"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
 
 	"github.com/anacrolix/missinggo/perf"
@@ -108,26 +109,25 @@ func setCalendarFanarts(movies []*CalendarMovie) []*CalendarMovie {
 func GetMovie(ID string) (movie *Movie) {
 	defer perf.ScopeTimer()()
 
-	endPoint := fmt.Sprintf("movies/%s", ID)
-
-	params := napping.Params{
-		"extended": "full,images",
-	}.AsUrlValues()
-
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TraktMovieKey, ID)
 	if err := cacheStore.Get(key, &movie); err != nil {
-		resp, err := Get(endPoint, params)
-
-		if err != nil {
-			log.Error(err)
-			if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
-				xbmcHost.Notify("Elementum", fmt.Sprintf("Failed getting Trakt movie (%s), check your logs.", ID), config.AddonIcon())
-			}
+		req := reqapi.Request{
+			API:    reqapi.TraktAPI,
+			URL:    fmt.Sprintf("movies/%s", ID),
+			Header: GetAvailableHeader(),
+			Params: napping.Params{
+				"extended": "full,images",
+			}.AsUrlValues(),
+			Result: &movie,
 		}
 
-		if err := resp.Unmarshal(&movie); err != nil {
-			log.Warning(err)
+		if err = req.Do(); err != nil {
+			log.Error(err)
+			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+				xbmcHost.Notify("Elementum", fmt.Sprintf("Failed getting Trakt movie (%s), check your logs.", ID), config.AddonIcon())
+			}
+			return
 		}
 
 		cacheStore.Set(key, movie, cache.TraktMovieExpire)
@@ -140,26 +140,26 @@ func GetMovie(ID string) (movie *Movie) {
 func GetMovieByTMDB(tmdbID string) (movie *Movie) {
 	defer perf.ScopeTimer()()
 
-	endPoint := fmt.Sprintf("search/tmdb/%s?type=movie", tmdbID)
-
-	params := napping.Params{}.AsUrlValues()
-
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TraktMovieByTMDBKey, tmdbID)
 	if err := cacheStore.Get(key, &movie); err != nil {
-		resp, err := Get(endPoint, params)
-		if err != nil {
+		var results MovieSearchResults
+		req := reqapi.Request{
+			API:    reqapi.TraktAPI,
+			URL:    fmt.Sprintf("search/tmdb/%s?type=movie", tmdbID),
+			Header: GetAvailableHeader(),
+			Params: napping.Params{}.AsUrlValues(),
+			Result: &results,
+		}
+
+		if err = req.Do(); err != nil {
 			log.Error(err)
-			if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 				xbmcHost.Notify("Elementum", "Failed getting Trakt movie using TMDB ID, check your logs.", config.AddonIcon())
 			}
 			return
 		}
 
-		var results MovieSearchResults
-		if err := resp.Unmarshal(&results); err != nil {
-			log.Warning(err)
-		}
 		if len(results) > 0 && results[0].Movie != nil {
 			movie = results[0].Movie
 		}
@@ -172,30 +172,26 @@ func GetMovieByTMDB(tmdbID string) (movie *Movie) {
 func SearchMovies(query string, page string) (movies []*Movies, err error) {
 	defer perf.ScopeTimer()()
 
-	endPoint := "search"
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    "search",
+		Header: GetAvailableHeader(),
+		Params: napping.Params{
+			"page":     page,
+			"limit":    strconv.Itoa(config.Get().ResultsPerPage),
+			"query":    query,
+			"extended": "full,images",
+		}.AsUrlValues(),
+		Result: &movies,
+	}
 
-	params := napping.Params{
-		"page":     page,
-		"limit":    strconv.Itoa(config.Get().ResultsPerPage),
-		"query":    query,
-		"extended": "full,images",
-	}.AsUrlValues()
-
-	resp, err := Get(endPoint, params)
-
-	if err != nil {
+	if err = req.Do(); err != nil {
 		return
-	} else if resp.Status() != 200 {
-		return movies, fmt.Errorf("Bad status searching Trakt movies: %d", resp.Status())
 	}
 
 	// TODO use response headers for pagination limits:
 	// X-Pagination-Page-Count:10
 	// X-Pagination-Item-Count:100
-
-	if err := resp.Unmarshal(&movies); err != nil {
-		log.Warning(err)
-	}
 
 	return
 }
@@ -222,37 +218,33 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 		pageInt = 1
 	}
 	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
-	params := napping.Params{
-		"page":     page,
-		"limit":    strconv.Itoa(limit),
-		"extended": "full,images",
-	}.AsUrlValues()
 
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TraktMoviesByCategoryKey, topCategory, page, limit)
 	totalKey := fmt.Sprintf(cache.TraktMoviesByCategoryTotalKey, topCategory)
 	if err := cacheStore.Get(key, &movies); err != nil || len(movies) == 0 {
-		var resp *napping.Response
-		var err error
-
-		if !config.Get().TraktAuthorized {
-			resp, err = Get(endPoint, params)
-		} else {
-			resp, err = GetWithAuth(endPoint, params)
-		}
-
-		if err != nil {
-			return movies, 0, err
-		} else if resp.Status() != 200 {
-			return movies, 0, fmt.Errorf("Bad status getting top %s Trakt shows: %d", topCategory, resp.Status())
+		var movieList []*Movie
+		req := &reqapi.Request{
+			API:    reqapi.TraktAPI,
+			URL:    endPoint,
+			Header: GetAvailableHeader(),
+			Params: napping.Params{
+				"page":     page,
+				"limit":    strconv.Itoa(limit),
+				"extended": "full,images",
+			}.AsUrlValues(),
+			Result: &movies,
 		}
 
 		if topCategory == "popular" || topCategory == "recommendations" {
-			var movieList []*Movie
-			if errUnm := resp.Unmarshal(&movieList); errUnm != nil {
-				log.Warning(errUnm)
-			}
+			req.Result = &movieList
+		}
 
+		if err = req.Do(); err != nil {
+			return movies, 0, err
+		}
+
+		if topCategory == "popular" || topCategory == "recommendations" {
 			movieListing := make([]*Movies, 0)
 			for _, movie := range movieList {
 				movieItem := Movies{
@@ -261,13 +253,9 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 				movieListing = append(movieListing, &movieItem)
 			}
 			movies = movieListing
-		} else {
-			if errUnm := resp.Unmarshal(&movies); errUnm != nil {
-				log.Warning(errUnm)
-			}
 		}
 
-		pagination := getPagination(resp.HttpResponse().Header)
+		pagination := getPagination(req.ResponseHeader)
 		total = pagination.ItemCount
 		if err != nil {
 			log.Warning(err)
@@ -302,12 +290,6 @@ func WatchlistMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 
 	defer perf.ScopeTimer()()
 
-	endPoint := "sync/watchlist/movies"
-
-	params := napping.Params{
-		"extended": "full,images",
-	}.AsUrlValues()
-
 	cacheStore := cache.NewDBStore()
 
 	if !isUpdateNeeded {
@@ -316,17 +298,19 @@ func WatchlistMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 		}
 	}
 
-	resp, err := GetWithAuth(endPoint, params)
-
-	if err != nil {
-		return movies, err
-	} else if resp.Status() != 200 {
-		return movies, fmt.Errorf("Bad status getting Trakt watchlist for movies: %d", resp.Status())
+	var watchlist []*WatchlistMovie
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    "sync/watchlist/movies",
+		Header: GetAvailableHeader(),
+		Params: napping.Params{
+			"extended": "full,images",
+		}.AsUrlValues(),
+		Result: &watchlist,
 	}
 
-	var watchlist []*WatchlistMovie
-	if err := resp.Unmarshal(&watchlist); err != nil {
-		log.Warning(err)
+	if err = req.Do(); err != nil {
+		return movies, err
 	}
 
 	movieListing := make([]*Movies, 0)
@@ -359,12 +343,6 @@ func CollectionMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 
 	defer perf.ScopeTimer()()
 
-	endPoint := "sync/collection/movies"
-
-	params := napping.Params{
-		"extended": "full,images",
-	}.AsUrlValues()
-
 	cacheStore := cache.NewDBStore()
 
 	if !isUpdateNeeded {
@@ -373,16 +351,20 @@ func CollectionMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 		}
 	}
 
-	resp, errGet := GetWithAuth(endPoint, params)
-
-	if errGet != nil {
-		return movies, errGet
-	} else if resp.Status() != 200 {
-		return movies, fmt.Errorf("Bad status getting Trakt collection for movies: %d", resp.Status())
+	var collection []*CollectionMovie
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    "sync/collection/movies",
+		Header: GetAvailableHeader(),
+		Params: napping.Params{
+			"extended": "full,images",
+		}.AsUrlValues(),
+		Result: &collection,
 	}
 
-	var collection []*CollectionMovie
-	resp.Unmarshal(&collection)
+	if err = req.Do(); err != nil {
+		return movies, err
+	}
 
 	movieListing := make([]*Movies, 0)
 	for _, movie := range collection {
@@ -403,42 +385,27 @@ func Userlists() (lists []*List) {
 
 	traktUsername := config.Get().TraktUsername
 	if traktUsername == "" || config.Get().TraktToken == "" || !config.Get().TraktAuthorized {
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 			xbmcHost.Notify("Elementum", "LOCALIZE[30149]", config.AddonIcon())
 		}
 		return lists
 	}
 	endPoint := fmt.Sprintf("users/%s/lists", traktUsername)
 
-	params := napping.Params{}.AsUrlValues()
-
-	var resp *napping.Response
-	var err error
-
-	if !config.Get().TraktAuthorized {
-		resp, err = Get(endPoint, params)
-	} else {
-		resp, err = GetWithAuth(endPoint, params)
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    endPoint,
+		Header: GetAvailableHeader(),
+		Params: napping.Params{}.AsUrlValues(),
+		Result: &lists,
 	}
 
-	if err != nil {
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+	if err := req.Do(); err != nil {
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 			xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 		}
 		log.Error(err)
 		return lists
-	}
-	if resp.Status() != 200 {
-		errMsg := fmt.Sprintf("Bad status getting custom lists for %s: %d", traktUsername, resp.Status())
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
-			xbmcHost.Notify("Elementum", errMsg, config.AddonIcon())
-		}
-		log.Warningf(errMsg)
-		return lists
-	}
-
-	if err := resp.Unmarshal(&lists); err != nil {
-		log.Warning(err)
 	}
 
 	sort.Slice(lists, func(i int, j int) bool {
@@ -454,42 +421,27 @@ func Likedlists() (lists []*List) {
 
 	traktUsername := config.Get().TraktUsername
 	if traktUsername == "" || config.Get().TraktToken == "" {
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 			xbmcHost.Notify("Elementum", "LOCALIZE[30149]", config.AddonIcon())
 		}
 		return lists
 	}
-	endPoint := "users/likes/lists"
-	params := napping.Params{}.AsUrlValues()
 
-	var resp *napping.Response
-	var err error
-
-	if !config.Get().TraktAuthorized {
-		resp, err = Get(endPoint, params)
-	} else {
-		resp, err = GetWithAuth(endPoint, params)
+	inputLists := []*ListContainer{}
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    "users/likes/lists",
+		Header: GetAvailableHeader(),
+		Params: napping.Params{}.AsUrlValues(),
+		Result: &inputLists,
 	}
 
-	if err != nil {
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+	if err := req.Do(); err != nil {
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 			xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 		}
 		log.Error(err)
 		return lists
-	}
-	if resp.Status() != 200 {
-		errMsg := fmt.Sprintf("Bad status getting liked lists for %s: %d", traktUsername, resp.Status())
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
-			xbmcHost.Notify("Elementum", errMsg, config.AddonIcon())
-		}
-		log.Warningf(errMsg)
-		return lists
-	}
-
-	inputLists := []*ListContainer{}
-	if err := resp.Unmarshal(&inputLists); err != nil {
-		log.Warning(err)
 	}
 
 	for _, l := range inputLists {
@@ -509,42 +461,26 @@ func TopLists(page string) (lists []*ListContainer, hasNext bool) {
 
 	pageInt, _ := strconv.Atoi(page)
 
-	endPoint := "lists/popular"
-	params := napping.Params{
-		"page":  page,
-		"limit": strconv.Itoa(ListsPerPage),
-	}.AsUrlValues()
-
-	var resp *napping.Response
-	var err error
-
-	if !config.Get().TraktAuthorized {
-		resp, err = Get(endPoint, params)
-	} else {
-		resp, err = GetWithAuth(endPoint, params)
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    "lists/popular",
+		Header: GetAvailableHeader(),
+		Params: napping.Params{
+			"page":  page,
+			"limit": strconv.Itoa(ListsPerPage),
+		}.AsUrlValues(),
+		Result: &lists,
 	}
 
-	if err != nil {
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+	if err := req.Do(); err != nil {
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 			xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 		}
 		log.Error(err)
 		return lists, hasNext
 	}
-	if resp.Status() != 200 {
-		errMsg := fmt.Sprintf("Bad status getting top lists: %d", resp.Status())
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
-			xbmcHost.Notify("Elementum", errMsg, config.AddonIcon())
-		}
-		log.Warningf(errMsg)
-		return lists, hasNext
-	}
 
-	if err := resp.Unmarshal(&lists); err != nil {
-		log.Warning(err)
-	}
-
-	p := getPagination(resp.HttpResponse().Header)
+	p := getPagination(req.ResponseHeader)
 	hasNext = p.PageCount > pageInt
 
 	return lists, hasNext
@@ -567,12 +503,6 @@ func ListItemsMovies(user string, listID string, isUpdateNeeded bool) (movies []
 		user = config.Get().TraktUsername
 	}
 
-	endPoint := fmt.Sprintf("users/%s/lists/%s/items/movies", user, listID)
-
-	params := napping.Params{}.AsUrlValues()
-
-	var resp *napping.Response
-
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TraktMoviesListKey, listID)
 
@@ -582,20 +512,17 @@ func ListItemsMovies(user string, listID string, isUpdateNeeded bool) (movies []
 		}
 	}
 
-	var errGet error
-	if !config.Get().TraktAuthorized {
-		resp, errGet = Get(endPoint, params)
-	} else {
-		resp, errGet = GetWithAuth(endPoint, params)
-	}
-
-	if errGet != nil || resp.Status() != 200 {
-		return movies, errGet
-	}
-
 	var list []*ListItem
-	if err = resp.Unmarshal(&list); err != nil {
-		log.Warning(err)
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    fmt.Sprintf("users/%s/lists/%s/items/movies", user, listID),
+		Header: GetAvailableHeader(),
+		Params: napping.Params{}.AsUrlValues(),
+		Result: &list,
+	}
+
+	if err = req.Do(); err != nil {
+		return movies, err
 	}
 
 	movieListing := make([]*Movies, 0)
@@ -625,32 +552,30 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 		return
 	}
 	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
-	params := napping.Params{
-		"page":     page,
-		"limit":    strconv.Itoa(limit),
-		"extended": "full,images",
-	}.AsUrlValues()
 
 	cacheStore := cache.NewDBStore()
 	endPointKey := strings.Replace(endPoint, "/", ".", -1)
 	key := fmt.Sprintf(cache.TraktMoviesCalendarKey, endPointKey, page, limit)
 	totalKey := fmt.Sprintf(cache.TraktMoviesCalendarTotalKey, endPointKey)
 	if err := cacheStore.Get(key, &movies); err != nil {
-		resp, err := GetWithAuth("calendars/"+endPoint, params)
+		req := &reqapi.Request{
+			API:    reqapi.TraktAPI,
+			URL:    "calendars/" + endPoint,
+			Header: GetAuthenticatedHeader(),
+			Params: napping.Params{
+				"page":     page,
+				"limit":    strconv.Itoa(limit),
+				"extended": "full,images",
+			}.AsUrlValues(),
+			Result: &movies,
+		}
 
-		if err != nil {
+		if err = req.Do(); err != nil {
 			log.Error(err)
 			return movies, 0, err
-		} else if resp.Status() != 200 {
-			log.Warning(resp.Status())
-			return movies, 0, fmt.Errorf("Bad status getting %s Trakt movies: %d", endPoint, resp.Status())
 		}
 
-		if errUnm := resp.Unmarshal(&movies); errUnm != nil {
-			log.Warning(errUnm)
-		}
-
-		pagination := getPagination(resp.HttpResponse().Header)
+		pagination := getPagination(req.ResponseHeader)
 		total = pagination.ItemCount
 		if err != nil {
 			total = -1

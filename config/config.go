@@ -289,7 +289,14 @@ var (
 var (
 	// Args for cli arguments parsing
 	Args = struct {
-		DisableBackup bool `help:"Disable database backup"`
+		EnableRequestTracing  bool `help:"Enable ReqAPI tracing"`
+		EnableDatabaseTracing bool `help:"Enable database tracing"`
+		EnableCacheTracing    bool `help:"Enable cache tracing"`
+
+		DisableCache    bool `help:"Disable caching for get/set methods"`
+		DisableCacheGet bool `help:"Disable caching for get methods"`
+		DisableCacheSet bool `help:"Disable caching for set methods"`
+		DisableBackup   bool `help:"Disable database backup"`
 
 		RemoteHost string `help:"Remote host IP or Hostname (Host with plugin.video.elementum running)"`
 		RemotePort int    `help:"Remote host Port (Host with plugin.video.elementum running)"`
@@ -312,8 +319,6 @@ var (
 
 		ExportConfig string `help:"Export current configuration, taken from Kodi into a file. Should end with json or yml suffix"`
 	}{
-		DisableBackup: false,
-
 		RemotePort: 65221,
 		LocalPort:  65220,
 	}

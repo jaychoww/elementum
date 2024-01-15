@@ -3,7 +3,6 @@ package tmdb
 import (
 	"fmt"
 	"math/rand"
-	"net/http"
 	"net/url"
 	"sort"
 	"time"
@@ -13,9 +12,9 @@ import (
 	"github.com/elgatito/elementum/fanart"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/util/event"
+	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
 
-	"github.com/anacrolix/missinggo/perf"
 	"github.com/jmcvetta/napping"
 	"github.com/op/go-logging"
 )
@@ -387,14 +386,7 @@ type APIRequest struct {
 }
 
 const (
-	tmdbEndpoint  = "https://api.themoviedb.org/3"
 	imageEndpoint = "https://image.tmdb.org/t/p/"
-	burstRate     = 150
-	burstTime     = 5 * time.Second
-	// Currently TMDB is disabled rates limiting
-	// burstRate               = 40
-	// burstTime               = 10 * time.Second
-	simultaneousConnections = 30
 )
 
 var (
@@ -407,8 +399,6 @@ var (
 	// WarmingUp ...
 	WarmingUp = event.Event{}
 )
-
-var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
 
 // CheckAPIKey ...
 func CheckAPIKey() {
@@ -447,24 +437,20 @@ func CheckAPIKey() {
 func tmdbCheck(key string) bool {
 	var result *Entity
 
-	urlValues := napping.Params{
-		"api_key": key,
-	}.AsUrlValues()
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: "/movie/550",
+		Params: napping.Params{
+			"api_key": key,
+		}.AsUrlValues(),
+		Result: &result,
+	}
 
-	resp, err := napping.Get(
-		tmdbEndpoint+"/movie/550",
-		&urlValues,
-		&result,
-		nil,
-	)
-
-	if err != nil {
+	if err := req.Do(); err != nil {
 		log.Error(err.Error())
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); err == nil && xbmcHost != nil {
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 			xbmcHost.Notify("Elementum", "TMDB check failed, check your logs.", config.AddonIcon())
 		}
-		return false
-	} else if resp.Status() != 200 {
 		return false
 	}
 
@@ -536,17 +522,18 @@ func Find(externalID string, externalSource string) *FindResult {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TMDBFindKey, externalSource, externalID)
 	if err := cacheStore.Get(key, &result); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/find/%s", tmdbEndpoint, externalID),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: fmt.Sprintf("/find/%s", externalID),
 			Params: napping.Params{
 				"api_key":         apiKey,
 				"external_source": externalSource,
 			}.AsUrlValues(),
 			Result:      &result,
 			Description: "find",
-		})
+		}
 
-		if err == nil && result != nil {
+		if err = req.Do(); err == nil && result != nil {
 			cacheStore.Set(key, result, cache.TMDBFindExpire)
 		}
 	}
@@ -561,16 +548,17 @@ func GetCountries(language string) []*Country {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf(cache.TMDBCountriesKey, language)
 	if err := cacheStore.Get(key, &countries); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/configuration/countries", tmdbEndpoint),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: "/configuration/countries",
 			Params: napping.Params{
 				"api_key": apiKey,
 			}.AsUrlValues(),
 			Result:      &countries,
 			Description: "countries",
-		})
+		}
 
-		if err == nil {
+		if err = req.Do(); err == nil {
 			sort.Slice(countries, func(i, j int) bool {
 				return countries[i].EnglishName < countries[j].EnglishName
 			})
@@ -587,16 +575,17 @@ func GetLanguages(language string) []*Language {
 
 	key := fmt.Sprintf(cache.TMDBLanguagesKey, language)
 	if err := cacheStore.Get(key, &languages); err != nil {
-		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/configuration/languages", tmdbEndpoint),
+		req := reqapi.Request{
+			API: reqapi.TMDBAPI,
+			URL: "/configuration/languages",
 			Params: napping.Params{
 				"api_key": apiKey,
 			}.AsUrlValues(),
 			Result:      &languages,
 			Description: "languages",
-		})
+		}
 
-		if err == nil {
+		if err = req.Do(); err == nil {
 			for _, l := range languages {
 				if l.Name == "" {
 					l.Name = l.EnglishName
@@ -610,54 +599,6 @@ func GetLanguages(language string) []*Language {
 		}
 	}
 	return languages
-}
-
-// MakeRequest used to proxy requests with proper RateLimiter usage and HTTP error processing
-func MakeRequest(r APIRequest) (ret error) {
-	defer perf.ScopeTimer()()
-
-	rl.Call(func() error {
-		httpTransport := &http.Transport{}
-		if config.Get().ProxyURL != "" {
-			proxyURL, _ := url.Parse(config.Get().ProxyURL)
-			httpTransport.Proxy = http.ProxyURL(proxyURL)
-		}
-		httpClient := &http.Client{
-			Transport: httpTransport,
-		}
-		session := napping.Session{
-			Client: httpClient,
-		}
-		resp, err := session.Get(
-			r.URL,
-			&r.Params,
-			r.Result,
-			r.ErrMsg,
-		)
-		if err != nil {
-			log.Errorf("Failed to make request to %s for %s with %+v: %s", r.URL, r.Description, r.Params, err)
-			ret = err
-		} else if resp.Status() == 429 {
-			log.Warningf("Rate limit exceeded getting %s with %+v on %s, cooling down...", r.Description, r.Params, r.URL)
-			rl.CoolDown(resp.HttpResponse().Header)
-			ret = util.ErrExceeded
-			return util.ErrExceeded
-		} else if resp.Status() == 404 {
-			log.Warningf("Rate limit exceeded getting %s with %+v on %s, cooling down...", r.Description, r.Params, r.URL)
-			rl.CoolDown(resp.HttpResponse().Header)
-			ret = util.ErrNotFound
-			return util.ErrNotFound
-		} else if resp.Status() != 200 {
-			log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, resp.Status())
-			ret = util.ErrHTTP
-			return util.ErrHTTP
-		}
-
-		ret = nil
-		return nil
-	})
-
-	return
 }
 
 // GetCountries returns list of countries
