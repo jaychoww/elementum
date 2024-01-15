@@ -10,7 +10,6 @@ const (
 	TMDBKey    = "com.tmdb."
 	TVDBKey    = "com.tvdb."
 	TraktKey   = "com.trakt."
-	ScraperKey = "scraper."
 	LibraryKey = "library."
 	FanartKey  = "fanart."
 
@@ -146,11 +145,4 @@ const (
 	LibraryResolveFileExpire      = 60 * 24 * time.Hour
 	LibrarySyncPlaycountKey       = LibraryKey + "SyncLastPlaycount.%s"
 	LibrarySyncPlaycountExpire    = 30 * 24 * time.Hour
-
-	ScraperLastExecutionKey    = ScraperKey + "last.execution"
-	ScraperLastExecutionExpire = 60 * 60 * 24 * 30
-	ScraperMoviesListKey       = ScraperKey + "movies.list.%d"
-	ScraperMoviesListExpire    = 60 * 60 * 6
-	ScraperMovieExistsKey      = ScraperKey + "movie.exists.%d.%d.%t"
-	ScraperMovieExistsExpire   = 60 * 60 * 24 * 365
 )
