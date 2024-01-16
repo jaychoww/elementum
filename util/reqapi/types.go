@@ -1,7 +1,7 @@
 package reqapi
 
 import (
-	"time"
+	"github.com/elgatito/elementum/util"
 )
 
 type APIIdent int
@@ -13,13 +13,8 @@ const (
 )
 
 type API struct {
-	Ident APIIdent
-
-	Endpoint string
-
-	BurstRate  int
-	BurstTime  time.Duration
-	Concurrent int
-
+	Ident       APIIdent
+	RateLimiter *util.RateLimiter
+	Endpoint    string
 	RetriesLeft int
 }

@@ -15,9 +15,11 @@ import (
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/util/trace"
 )
 
 type Request struct {
+	trace.Tracer
 	API *API
 
 	Method      string
@@ -38,14 +40,24 @@ type Request struct {
 	ResponseSize       uint64
 
 	Result any
+}
 
-	current  time.Time
-	create   time.Time
-	complete time.Time
+func (r *Request) Prepare() (err error) {
+	r.URL = r.API.GetURL(r.URL)
 
-	currentStage int
-	stages       []string
-	timers       []time.Duration
+	if r.Method == "" {
+		if r.Payload != nil {
+			r.Method = "POST"
+		} else {
+			r.Method = "GET"
+		}
+	}
+
+	if r.Header == nil {
+		r.Header = http.Header{}
+	}
+
+	return nil
 }
 
 func (r *Request) Do() (err error) {
@@ -64,14 +76,9 @@ func (r *Request) Do() (err error) {
 		return
 	}
 
-	r.URL = r.API.GetURL(r.URL)
-
-	if r.Method == "" {
-		if r.Payload != nil {
-			r.Method = "POST"
-		} else {
-			r.Method = "GET"
-		}
+	// Do internal preparations
+	if err = r.Prepare(); err != nil {
+		return
 	}
 
 	req := &napping.Request{
@@ -82,6 +89,7 @@ func (r *Request) Do() (err error) {
 		CaptureResponseBody: true,
 	}
 
+	// Apply body payload to request
 	if r.Payload != nil {
 		req.Payload = r.Payload
 		req.RawPayload = true
@@ -89,8 +97,7 @@ func (r *Request) Do() (err error) {
 
 	var resp *napping.Response
 
-	rl := r.API.GetRateLimiter()
-	rl.Call(func() error {
+	r.API.RateLimiter.Call(func() error {
 		r.Stage("Request")
 
 		for {
@@ -102,20 +109,20 @@ func (r *Request) Do() (err error) {
 
 			if err != nil {
 				log.Errorf("Failed to make request to %s for %s with %+v: %s", r.URL, r.Description, r.Params, err)
-			} else if resp.Status() == 429 {
+			} else if r.ResponseStatusCode == 429 {
 				log.Warningf("Rate limit exceeded getting %s with %+v on %s, cooling down...", r.Description, r.Params, r.URL)
-				rl.CoolDown(resp.HttpResponse().Header)
+				r.API.RateLimiter.CoolDown(r.ResponseHeader)
 				err = util.ErrExceeded
 				return err
-			} else if resp.Status() == 404 {
+			} else if r.ResponseStatusCode == 404 {
 				log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, resp.Status())
 				err = util.ErrNotFound
 				return err
-			} else if resp.Status() == 403 && r.API.RetriesLeft > 0 {
+			} else if r.ResponseStatusCode == 403 && r.API.RetriesLeft > 0 {
 				r.API.RetriesLeft--
 				log.Warningf("Not authorized to get %s with %+v on %s, having %d retries left ...", r.Description, r.Params, r.URL, r.API.RetriesLeft)
 				continue
-			} else if resp.Status() < 200 || resp.Status() >= 300 {
+			} else if r.ResponseStatusCode < 200 || r.ResponseStatusCode >= 300 {
 				log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, resp.Status())
 				err = util.ErrHTTP
 				return err
@@ -145,13 +152,8 @@ func (r *Request) Do() (err error) {
 }
 
 func (r *Request) String() string {
-	if r.complete.IsZero() {
+	if r.IsComplete() {
 		r.Complete()
-	}
-
-	stages := bytes.Buffer{}
-	for stage := 0; stage < r.currentStage; stage++ {
-		stages.WriteString(fmt.Sprintf("\n%18s: %s", r.stages[stage], r.timers[stage]))
 	}
 
 	params, _ := url.QueryUnescape(r.Params.Encode())
@@ -159,9 +161,7 @@ func (r *Request) String() string {
                URL: %s %s
             Params: %s
             Header: %+v
-
-           Created: %s%s
-          Complete: %s
+%s
 
              Error: %#v
               Size: %s
@@ -169,44 +169,16 @@ func (r *Request) String() string {
         StatusCode: %d
    Response Header: %+v
 	`, r.Description, r.Method, r.URL,
-		params, r.Header, r.create.Format("2006-01-02 15:04:05"), stages.String(), r.complete.Sub(r.create),
+		params, r.Header, r.Tracer.String(),
 		r.ResponseError, humanize.Bytes(r.ResponseSize), r.ResponseStatus, r.ResponseStatusCode, r.ResponseHeader)
 }
 
 func (r *Request) Reset() {
-	r.current = time.Time{}
-	r.create = time.Time{}
-	r.complete = time.Time{}
-
-	r.currentStage = 0
-	r.stages = []string{}
-	r.timers = []time.Duration{}
+	r.Tracer.Reset()
 
 	r.ResponseSize = 0
 	r.ResponseBody = nil
 	r.ResponseError = nil
-}
-
-func (r *Request) Current() {
-	r.current = time.Now()
-}
-
-func (r *Request) Create() {
-	r.Reset()
-	r.create = time.Now()
-	r.Current()
-}
-
-func (r *Request) Stage(name string) {
-	r.timers = append(r.timers, time.Since(r.current))
-	r.stages = append(r.stages, name)
-	r.currentStage++
-	r.Current()
-}
-
-func (r *Request) Complete() {
-	r.complete = time.Now()
-	r.Current()
 }
 
 func (r *Request) Size(size uint64) {

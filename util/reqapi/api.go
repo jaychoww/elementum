@@ -9,52 +9,32 @@ import (
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
+
 	"github.com/jmcvetta/napping"
 	"github.com/op/go-logging"
 )
 
 var (
 	TMDBAPI = &API{
-		Ident: TMDBIdent,
-
-		Endpoint: "https://api.themoviedb.org/3",
-
-		BurstRate:  50,
-		BurstTime:  1 * time.Second,
-		Concurrent: 50,
-
+		Ident:       TMDBIdent,
+		Endpoint:    "https://api.themoviedb.org/3",
 		RetriesLeft: 3,
+		RateLimiter: util.NewRateLimiter(50, 1*time.Second, 50),
 	}
 
 	TraktAPI = &API{
-		Ident: TraktIdent,
-
-		Endpoint: "https://api.trakt.tv",
-
-		BurstRate:  100,
-		BurstTime:  10 * time.Second,
-		Concurrent: 25,
-
+		Ident:       TraktIdent,
+		Endpoint:    "https://api.trakt.tv",
 		RetriesLeft: 3,
+		RateLimiter: util.NewRateLimiter(100, 10*time.Second, 25),
 	}
 
 	FanartAPI = &API{
-		Ident: FanArtIdent,
-
-		Endpoint: "http://webservice.fanart.tv/v3",
-
-		BurstRate:  100,
-		BurstTime:  10 * time.Second,
-		Concurrent: 25,
-
+		Ident:       FanArtIdent,
+		Endpoint:    "http://webservice.fanart.tv/v3",
 		RetriesLeft: 3,
+		RateLimiter: util.NewRateLimiter(100, 10*time.Second, 25),
 	}
-)
-
-var (
-	tmdbRateLimiter   = util.NewRateLimiter(TMDBAPI.BurstRate, TMDBAPI.BurstTime, TMDBAPI.Concurrent)
-	traktRateLimiter  = util.NewRateLimiter(TraktAPI.BurstRate, TraktAPI.BurstTime, TraktAPI.Concurrent)
-	fanartRateLimiter = util.NewRateLimiter(TraktAPI.BurstRate, TraktAPI.BurstTime, TraktAPI.Concurrent)
 )
 
 var log = logging.MustGetLogger("reqapi")
@@ -81,19 +61,6 @@ func (api *API) GetURL(url string) string {
 		return fmt.Sprintf("%s%s", api.Endpoint, url)
 	} else {
 		return fmt.Sprintf("%s/%s", api.Endpoint, url)
-	}
-}
-
-func (api *API) GetRateLimiter() *util.RateLimiter {
-	switch api.Ident {
-	case TMDBIdent:
-		return tmdbRateLimiter
-	case TraktIdent:
-		return traktRateLimiter
-	case FanArtIdent:
-		return fanartRateLimiter
-	default:
-		return nil
 	}
 }
 
