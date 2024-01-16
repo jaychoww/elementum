@@ -151,10 +151,6 @@ func GetShow(showID int, language string) (show *Show) {
 			return nil
 		}
 
-		if config.Get().UseFanartTv {
-			show.FanArt = fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID))
-		}
-
 		cacheStore.Set(key, &show, cache.TMDBShowByIDExpire)
 	}
 	if show == nil {
@@ -632,8 +628,13 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 		}
 	}
 
-	if config.Get().UseFanartTv && show.FanArt != nil {
-		item.Art = show.FanArt.ToListItemArt(item.Art)
+	if config.Get().UseFanartTv {
+		if show.FanArt == nil {
+			show.FanArt = fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID))
+		}
+		if show.FanArt != nil {
+			item.Art = show.FanArt.ToListItemArt(item.Art)
+		}
 	}
 
 	item.Thumbnail = item.Art.Poster

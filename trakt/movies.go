@@ -18,12 +18,11 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 
 	"github.com/anacrolix/missinggo/perf"
-	"github.com/anacrolix/sync"
 	"github.com/jmcvetta/napping"
 )
 
 // Fill fanart from TMDB
-func setFanart(movie *Movie) *Movie {
+func setFanart(movie *Movie, tmdbMovie *tmdb.Movie) *Movie {
 	if movie.Images == nil {
 		movie.Images = &Images{}
 	}
@@ -43,18 +42,13 @@ func setFanart(movie *Movie) *Movie {
 		movie.Images.ClearArt = &Sizes{}
 	}
 
-	if movie.IDs == nil || movie.IDs.TMDB == 0 {
+	if movie.IDs == nil || movie.IDs.TMDB == 0 || tmdbMovie == nil || tmdbMovie.Images == nil {
 		return movie
 	}
 
-	tmdbImages := tmdb.GetImages(movie.IDs.TMDB)
-	if tmdbImages == nil {
-		return movie
-	}
-
-	if len(tmdbImages.Posters) > 0 {
-		posterImage := tmdb.ImageURL(tmdbImages.Posters[0].FilePath, "w1280")
-		for _, image := range tmdbImages.Posters {
+	if len(tmdbMovie.Images.Posters) > 0 {
+		posterImage := tmdb.ImageURL(tmdbMovie.Images.Posters[0].FilePath, "w1280")
+		for _, image := range tmdbMovie.Images.Posters {
 			if image.Iso639_1 == config.Get().Language {
 				posterImage = tmdb.ImageURL(image.FilePath, "w1280")
 				break
@@ -63,9 +57,9 @@ func setFanart(movie *Movie) *Movie {
 		movie.Images.Poster.Full = posterImage
 		movie.Images.Thumbnail.Full = posterImage
 	}
-	if len(tmdbImages.Backdrops) > 0 {
-		backdropImage := tmdb.ImageURL(tmdbImages.Backdrops[0].FilePath, "w1280")
-		for _, image := range tmdbImages.Backdrops {
+	if len(tmdbMovie.Images.Backdrops) > 0 {
+		backdropImage := tmdb.ImageURL(tmdbMovie.Images.Backdrops[0].FilePath, "w1280")
+		for _, image := range tmdbMovie.Images.Backdrops {
 			if image.Iso639_1 == config.Get().Language {
 				backdropImage = tmdb.ImageURL(image.FilePath, "w1280")
 				break
@@ -75,34 +69,6 @@ func setFanart(movie *Movie) *Movie {
 		movie.Images.Banner.Full = backdropImage
 	}
 	return movie
-}
-
-func setFanarts(movies []*Movies) []*Movies {
-	wg := sync.WaitGroup{}
-	for i, movie := range movies {
-		wg.Add(1)
-		go func(idx int, m *Movies) {
-			defer wg.Done()
-			movies[idx].Movie = setFanart(m.Movie)
-		}(i, movie)
-	}
-	wg.Wait()
-
-	return movies
-}
-
-func setCalendarFanarts(movies []*CalendarMovie) []*CalendarMovie {
-	wg := sync.WaitGroup{}
-	for i, movie := range movies {
-		wg.Add(1)
-		go func(idx int, m *CalendarMovie) {
-			defer wg.Done()
-			movies[idx].Movie = setFanart(m.Movie)
-		}(i, movie)
-	}
-	wg.Wait()
-
-	return movies
 }
 
 // GetMovie ...
@@ -654,14 +620,17 @@ func PausedMovies(isUpdateNeeded bool) ([]*PausedMovie, error) {
 func (movie *Movie) ToListItem() (item *xbmc.ListItem) {
 	defer perf.ScopeTimer()()
 
-	if !config.Get().ForceUseTrakt && movie.IDs.TMDB != 0 {
+	var tmdbMovie *tmdb.Movie
+	if movie.IDs.TMDB != 0 {
 		tmdbID := strconv.Itoa(movie.IDs.TMDB)
-		if tmdbMovie := tmdb.GetMovieByID(tmdbID, config.Get().Language); tmdbMovie != nil {
-			item = tmdbMovie.ToListItem()
+		if tmdbMovie = tmdb.GetMovieByID(tmdbID, config.Get().Language); tmdbMovie != nil {
+			if !config.Get().ForceUseTrakt {
+				item = tmdbMovie.ToListItem()
+			}
 		}
 	}
 	if item == nil {
-		movie = setFanart(movie)
+		movie = setFanart(movie, tmdbMovie)
 		item = &xbmc.ListItem{
 			Label: movie.Title,
 			Info: &xbmc.ListItemInfo{

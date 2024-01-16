@@ -174,7 +174,7 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 	}
 
 	if config.Get().ShowUnwatchedEpisodesNumber {
-		season.EpisodeCount = season.countEpisodesNumber()
+		season.EpisodeCount = season.countEpisodesNumber(show)
 	}
 
 	item := &xbmc.ListItem{

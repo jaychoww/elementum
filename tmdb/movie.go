@@ -84,10 +84,6 @@ func GetMovieByID(movieID string, language string) *Movie {
 		}
 
 		if err = req.Do(); err == nil && movie != nil {
-			if config.Get().UseFanartTv {
-				movie.FanArt = fanart.GetMovie(movie.ID)
-			}
-
 			cacheStore.Set(key, movie, cache.TMDBMovieByIDExpire)
 		}
 	}
@@ -521,8 +517,13 @@ func (movie *Movie) ToListItem() *xbmc.ListItem {
 		}
 	}
 
-	if config.Get().UseFanartTv && movie.FanArt != nil {
-		item.Art = movie.FanArt.ToListItemArt(item.Art)
+	if config.Get().UseFanartTv {
+		if movie.FanArt == nil {
+			movie.FanArt = fanart.GetMovie(movie.ID)
+		}
+		if movie.FanArt != nil {
+			item.Art = movie.FanArt.ToListItemArt(item.Art)
+		}
 	}
 
 	item.Thumbnail = item.Art.Poster
@@ -632,4 +633,34 @@ func (movie *Movie) findTranslation(language string) *Translation {
 	}
 
 	return nil
+}
+
+// GetCountries returns list of countries
+func (movie *Movie) GetCountries() []string {
+	countries := make([]string, 0, len(movie.ProductionCountries))
+	for _, country := range movie.ProductionCountries {
+		countries = append(countries, country.Name)
+	}
+
+	return countries
+}
+
+// GetStudios returns list of studios
+func (movie *Movie) GetStudios() []string {
+	studios := make([]string, 0, len(movie.ProductionCompanies))
+	for _, company := range movie.ProductionCompanies {
+		studios = append(studios, company.Name)
+	}
+
+	return studios
+}
+
+// GetGenres returns list of genres
+func (movie *Movie) GetGenres() []string {
+	genres := make([]string, 0, len(movie.Genres))
+	for _, genre := range movie.Genres {
+		genres = append(genres, genre.Name)
+	}
+
+	return genres
 }

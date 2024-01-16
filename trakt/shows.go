@@ -47,14 +47,15 @@ func setShowFanart(show *Show) *Show {
 		return show
 	}
 
-	tmdbImages := tmdb.GetShowImages(show.IDs.TMDB)
-	if tmdbImages == nil {
+	tmdbID := strconv.Itoa(show.IDs.TMDB)
+	tmdbShow := tmdb.GetShowByID(tmdbID, config.Get().Language)
+	if tmdbShow == nil || tmdbShow.Images == nil {
 		return show
 	}
 
-	if len(tmdbImages.Posters) > 0 {
-		posterImage := tmdb.ImageURL(tmdbImages.Posters[0].FilePath, "w1280")
-		for _, image := range tmdbImages.Posters {
+	if len(tmdbShow.Images.Posters) > 0 {
+		posterImage := tmdb.ImageURL(tmdbShow.Images.Posters[0].FilePath, "w1280")
+		for _, image := range tmdbShow.Images.Posters {
 			if image.Iso639_1 == config.Get().Language {
 				posterImage = tmdb.ImageURL(image.FilePath, "w1280")
 				break
@@ -63,9 +64,9 @@ func setShowFanart(show *Show) *Show {
 		show.Images.Poster.Full = posterImage
 		show.Images.Thumbnail.Full = posterImage
 	}
-	if len(tmdbImages.Backdrops) > 0 {
-		backdropImage := tmdb.ImageURL(tmdbImages.Backdrops[0].FilePath, "w1280")
-		for _, image := range tmdbImages.Backdrops {
+	if len(tmdbShow.Images.Backdrops) > 0 {
+		backdropImage := tmdb.ImageURL(tmdbShow.Images.Backdrops[0].FilePath, "w1280")
+		for _, image := range tmdbShow.Images.Backdrops {
 			if image.Iso639_1 == config.Get().Language {
 				backdropImage = tmdb.ImageURL(image.FilePath, "w1280")
 				break
@@ -1146,6 +1147,10 @@ func (show *Show) CountRealSeasons() int {
 
 	ret := 0
 	for _, s := range seasons {
+		if s == nil {
+			continue
+		}
+
 		if !c.ShowUnairedSeasons {
 			if _, isExpired := util.AirDateWithExpireCheck(s.FirstAired, time.RFC3339, c.ShowEpisodesOnReleaseDay); isExpired {
 				continue
