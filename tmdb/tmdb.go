@@ -5,12 +5,10 @@ import (
 	"math/rand"
 	"net/url"
 	"sort"
-	"time"
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/fanart"
-	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/util/event"
 	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
@@ -96,6 +94,8 @@ type Show struct {
 	ProductionCountries []*Country    `json:"production_countries"`
 	Status              string        `json:"status"`
 	ExternalIDs         *ExternalIDs  `json:"external_ids"`
+
+	LastEpisodeToAir *Episode `json:"last_episode_to_air"`
 
 	Translations *struct {
 		Translations []*Translation `json:"translations"`
@@ -599,176 +599,6 @@ func GetLanguages(language string) []*Language {
 		}
 	}
 	return languages
-}
-
-// GetCountries returns list of countries
-func (movie *Movie) GetCountries() []string {
-	countries := make([]string, 0, len(movie.ProductionCountries))
-	for _, country := range movie.ProductionCountries {
-		countries = append(countries, country.Name)
-	}
-
-	return countries
-}
-
-// GetStudios returns list of studios
-func (movie *Movie) GetStudios() []string {
-	studios := make([]string, 0, len(movie.ProductionCompanies))
-	for _, company := range movie.ProductionCompanies {
-		studios = append(studios, company.Name)
-	}
-
-	return studios
-}
-
-// GetGenres returns list of genres
-func (movie *Movie) GetGenres() []string {
-	genres := make([]string, 0, len(movie.Genres))
-	for _, genre := range movie.Genres {
-		genres = append(genres, genre.Name)
-	}
-
-	return genres
-}
-
-// EpisodesTillSeason counts how many episodes exist before this season.
-func (show *Show) EpisodesTillSeason(season int) int {
-	if len(show.Seasons) < season {
-		return 0
-	}
-
-	ret := 0
-	for _, s := range show.Seasons {
-		if s != nil && s.Season > 0 && s.Season < season {
-			ret += s.EpisodeCount
-		}
-	}
-	return ret
-}
-
-// GetSeasonByRealNumber returns season object corresponding to real season number.
-func (show *Show) GetSeasonByRealNumber(season int) *Season {
-	if len(show.Seasons) <= 0 {
-		return nil
-	}
-
-	for _, s := range show.Seasons {
-		if s != nil && s.Season == season {
-			return s
-		}
-	}
-	return nil
-}
-
-// CountRealSeasons counts real seasons, meaning without specials.
-func (show *Show) CountRealSeasons() int {
-	if len(show.Seasons) <= 0 {
-		return 0
-	}
-
-	c := config.Get()
-
-	ret := 0
-	for _, s := range show.Seasons {
-		if !c.ShowUnairedSeasons {
-			if _, isExpired := util.AirDateWithExpireCheck(s.AirDate, time.DateOnly, c.ShowEpisodesOnReleaseDay); isExpired {
-				continue
-			}
-		}
-		if !c.ShowSeasonsSpecials && s.Season <= 0 {
-			continue
-		}
-
-		ret++
-	}
-	return ret
-}
-
-// GetCountries returns list of countries
-func (show *Show) GetCountries() []string {
-	countries := make([]string, 0, len(show.ProductionCountries))
-	for _, country := range show.ProductionCountries {
-		countries = append(countries, country.Name)
-	}
-
-	return countries
-}
-
-// GetStudios returns list of studios
-func (show *Show) GetStudios() []string {
-	if config.Get().TMDBShowUseProdCompanyAsStudio {
-		studios := show.GetProductionCompanies()
-		if len(studios) != 0 {
-			return studios
-		} else {
-			return show.GetNetworks()
-		}
-	} else {
-		studios := show.GetNetworks()
-		if len(studios) != 0 {
-			return studios
-		} else {
-			return show.GetProductionCompanies()
-		}
-	}
-}
-
-// GetProductionCompanies returns list of production companies
-func (show *Show) GetProductionCompanies() []string {
-	companies := make([]string, 0, len(show.ProductionCompanies))
-	for _, company := range show.ProductionCompanies {
-		companies = append(companies, company.Name)
-	}
-
-	return companies
-}
-
-// GetNetworks returns list of networks
-func (show *Show) GetNetworks() []string {
-	networks := make([]string, 0, len(show.Networks))
-	for _, network := range show.Networks {
-		networks = append(networks, network.Name)
-	}
-
-	return networks
-}
-
-// GetGenres returns list of genres
-func (show *Show) GetGenres() []string {
-	genres := make([]string, 0, len(show.Genres))
-	for _, genre := range show.Genres {
-		genres = append(genres, genre.Name)
-	}
-
-	return genres
-}
-
-// HasEpisode checks if episode with specific number is available in the episodes list
-func (season *Season) HasEpisode(episode int) bool {
-	if len(season.Episodes) <= 0 {
-		return false
-	}
-
-	for _, e := range season.Episodes {
-		if e != nil && e.EpisodeNumber == episode {
-			return true
-		}
-	}
-	return false
-}
-
-// GetEpisode gets episode with specific number from Episodes list
-func (season *Season) GetEpisode(episode int) *Episode {
-	if len(season.Episodes) <= 0 {
-		return nil
-	}
-
-	for _, e := range season.Episodes {
-		if e != nil && e.EpisodeNumber == episode {
-			return e
-		}
-	}
-	return nil
 }
 
 // GetCastMembers returns formatted cast members

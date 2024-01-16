@@ -316,20 +316,37 @@ func (season *Season) findTranslation(language string) *Translation {
 
 // countWatchedEpisodesNumber returns number of watched episodes
 func (season *Season) countWatchedEpisodesNumber(show *Show) (watchedEpisodes int) {
+	c := config.Get()
+	if !c.ShowSeasonsSpecials && season.Season <= 0 {
+		return
+	}
 	if show == nil {
 		return
 	}
 
-	c := config.Get()
-
-	if !c.ShowSeasonsSpecials && season.Season <= 0 {
-		return
+	if playcount.GetWatchedSeasonByTMDB(show.ID, season.Season) {
+		return season.EpisodeCount
 	}
 
-	if playcount.GetWatchedSeasonByTMDB(show.ID, season.Season) {
-		watchedEpisodes += season.EpisodeCount
+	if show.IsSeasonAired(season.Season) || c.ShowUnairedEpisodes {
+		for i := 1; i <= season.EpisodeCount; i++ {
+			if playcount.GetWatchedEpisodeByTMDB(show.ID, season.Season, i) {
+				watchedEpisodes++
+			}
+		}
+	} else if show.LastEpisodeToAir != nil && show.LastEpisodeToAir.SeasonNumber == season.Season {
+		for i := 1; i <= show.LastEpisodeToAir.EpisodeNumber; i++ {
+			if playcount.GetWatchedEpisodeByTMDB(show.ID, season.Season, i) {
+				watchedEpisodes++
+			}
+		}
 	} else {
-		for _, episode := range season.Episodes {
+		s := show.EnsureSeason(season.Season)
+		if s == nil || s.Episodes == nil {
+			return
+		}
+
+		for _, episode := range s.Episodes {
 			if episode == nil {
 				continue
 			} else if !c.ShowUnairedEpisodes {
@@ -350,30 +367,67 @@ func (season *Season) countWatchedEpisodesNumber(show *Show) (watchedEpisodes in
 }
 
 // countEpisodesNumber returns number of episodes
-func (season *Season) countEpisodesNumber() (episodes int) {
-	if season.Episodes == nil {
-		return season.EpisodeCount
-	}
-
+func (season *Season) countEpisodesNumber(show *Show) (episodes int) {
 	c := config.Get()
-
 	if !c.ShowSeasonsSpecials && season.Season <= 0 {
 		return
 	}
+	if show == nil {
+		return
+	}
 
-	for _, episode := range season.Episodes {
-		if episode == nil {
-			continue
-		} else if !c.ShowUnairedEpisodes {
-			if episode.AirDate == "" {
-				continue
-			}
-			if _, isExpired := util.AirDateWithExpireCheck(episode.AirDate, time.DateOnly, c.ShowEpisodesOnReleaseDay); isExpired {
-				continue
-			}
+	if show.IsSeasonAired(season.Season) || c.ShowUnairedEpisodes {
+		return season.EpisodeCount
+	} else if show.LastEpisodeToAir != nil && show.LastEpisodeToAir.SeasonNumber == season.Season {
+		return show.LastEpisodeToAir.EpisodeNumber
+	} else {
+		s := show.EnsureSeason(season.Season)
+		if s == nil || s.Episodes == nil {
+			return season.EpisodeCount
 		}
 
-		episodes++
+		for _, episode := range s.Episodes {
+			if episode == nil {
+				continue
+			} else if !c.ShowUnairedEpisodes {
+				if episode.AirDate == "" {
+					continue
+				}
+				if _, isExpired := util.AirDateWithExpireCheck(episode.AirDate, time.DateOnly, c.ShowEpisodesOnReleaseDay); isExpired {
+					continue
+				}
+			}
+
+			episodes++
+		}
+		return
 	}
-	return
+}
+
+// HasEpisode checks if episode with specific number is available in the episodes list
+func (season *Season) HasEpisode(episode int) bool {
+	if len(season.Episodes) <= 0 {
+		return false
+	}
+
+	for _, e := range season.Episodes {
+		if e != nil && e.EpisodeNumber == episode {
+			return true
+		}
+	}
+	return false
+}
+
+// GetEpisode gets episode with specific number from Episodes list
+func (season *Season) GetEpisode(episode int) *Episode {
+	if len(season.Episodes) <= 0 {
+		return nil
+	}
+
+	for _, e := range season.Episodes {
+		if e != nil && e.EpisodeNumber == episode {
+			return e
+		}
+	}
+	return nil
 }

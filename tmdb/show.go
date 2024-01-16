@@ -555,7 +555,6 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 
 	if config.Get().ShowUnwatchedEpisodesNumber {
 		// Get all seasons information for this show, it is required to get Air dates
-		show.GetSeasons()
 		show.NumberOfEpisodes = show.countEpisodesNumber()
 	}
 
@@ -755,22 +754,180 @@ func (show *Show) countEpisodesNumber() (episodes int) {
 		if season == nil {
 			continue
 		}
-		episodes += season.countEpisodesNumber()
+		episodes += season.countEpisodesNumber(show)
 	}
 
 	return
 }
 
-func (show *Show) GetSeasons() {
-	wg := sync.WaitGroup{}
-	for i, season := range show.Seasons {
-		if season.Translations == nil && (season.Name == "" || season.Overview == "" || len(season.Episodes) == 0) {
-			wg.Add(1)
-			go func(idx int, season *Season) {
-				defer wg.Done()
-				show.Seasons[idx] = GetSeason(show.ID, season.Season, config.Get().Language, len(show.Seasons), false)
-			}(i, season)
+// EpisodesTillSeason counts how many episodes exist before this season.
+func (show *Show) EpisodesTillSeason(season int) int {
+	if len(show.Seasons) < season {
+		return 0
+	}
+
+	ret := 0
+	for _, s := range show.Seasons {
+		if s != nil && s.Season > 0 && s.Season < season {
+			ret += s.EpisodeCount
 		}
 	}
-	wg.Wait()
+	return ret
+}
+
+// GetSeasonByRealNumber returns season object corresponding to real season number.
+func (show *Show) GetSeasonByRealNumber(season int) *Season {
+	if len(show.Seasons) <= 0 {
+		return nil
+	}
+
+	for _, s := range show.Seasons {
+		if s != nil && s.Season == season {
+			return s
+		}
+	}
+	return nil
+}
+
+// CountRealSeasons counts real seasons, meaning without specials.
+func (show *Show) CountRealSeasons() int {
+	if len(show.Seasons) <= 0 {
+		return 0
+	}
+
+	c := config.Get()
+
+	ret := 0
+	for _, s := range show.Seasons {
+		if s == nil {
+			continue
+		}
+
+		if !c.ShowUnairedSeasons {
+			if _, isExpired := util.AirDateWithExpireCheck(s.AirDate, time.DateOnly, c.ShowEpisodesOnReleaseDay); isExpired {
+				continue
+			}
+		}
+		if !c.ShowSeasonsSpecials && s.Season <= 0 {
+			continue
+		}
+
+		ret++
+	}
+	return ret
+}
+
+// GetCountries returns list of countries
+func (show *Show) GetCountries() []string {
+	countries := make([]string, 0, len(show.ProductionCountries))
+	for _, country := range show.ProductionCountries {
+		countries = append(countries, country.Name)
+	}
+
+	return countries
+}
+
+// GetStudios returns list of studios
+func (show *Show) GetStudios() []string {
+	if config.Get().TMDBShowUseProdCompanyAsStudio {
+		studios := show.GetProductionCompanies()
+		if len(studios) != 0 {
+			return studios
+		} else {
+			return show.GetNetworks()
+		}
+	} else {
+		studios := show.GetNetworks()
+		if len(studios) != 0 {
+			return studios
+		} else {
+			return show.GetProductionCompanies()
+		}
+	}
+}
+
+// GetProductionCompanies returns list of production companies
+func (show *Show) GetProductionCompanies() []string {
+	companies := make([]string, 0, len(show.ProductionCompanies))
+	for _, company := range show.ProductionCompanies {
+		companies = append(companies, company.Name)
+	}
+
+	return companies
+}
+
+// GetNetworks returns list of networks
+func (show *Show) GetNetworks() []string {
+	networks := make([]string, 0, len(show.Networks))
+	for _, network := range show.Networks {
+		networks = append(networks, network.Name)
+	}
+
+	return networks
+}
+
+// GetGenres returns list of genres
+func (show *Show) GetGenres() []string {
+	genres := make([]string, 0, len(show.Genres))
+	for _, genre := range show.Genres {
+		genres = append(genres, genre.Name)
+	}
+
+	return genres
+}
+
+func (show *Show) EnsureSeason(season int) *Season {
+	if show.Seasons == nil {
+		return nil
+	}
+
+	for idx, s := range show.Seasons {
+		if s == nil || s.Season != season {
+			continue
+		}
+
+		if s.Episodes != nil && len(s.Episodes) > 0 {
+			return s
+		}
+
+		show.Seasons[idx] = GetSeason(show.ID, season, config.Get().Language, len(show.Seasons), false)
+		return show.Seasons[idx]
+	}
+
+	return nil
+}
+
+func (show *Show) GetSeasonAirDate(season int) time.Time {
+	if season <= 0 {
+		return time.Time{}
+	}
+
+	for _, s := range show.Seasons {
+		if s == nil || s.Season != season {
+			continue
+		}
+
+		if aired, err := time.Parse(time.DateOnly, s.AirDate); err == nil {
+			return aired
+		}
+
+		return time.Time{}
+	}
+
+	return time.Time{}
+}
+
+func (show *Show) IsSeasonAired(season int) bool {
+	if season <= 0 {
+		return false
+	}
+
+	// If Last aired episode is from never season - then everything older is considered aired
+	if show.LastEpisodeToAir != nil {
+		return show.LastEpisodeToAir.SeasonNumber > season
+	}
+
+	// If next season is aired - then everything older is considered aired
+	nextSeasonAired := show.GetSeasonAirDate(season + 1)
+	return !nextSeasonAired.IsZero() && nextSeasonAired.Before(time.Now())
 }
