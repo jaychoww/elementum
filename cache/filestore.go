@@ -2,11 +2,12 @@ package cache
 
 import (
 	"compress/gzip"
-	"encoding/json"
 	"errors"
 	"os"
 	"path"
 	"time"
+
+	"github.com/goccy/go-json"
 )
 
 // FileStore ...

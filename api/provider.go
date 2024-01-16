@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -9,7 +8,9 @@ import (
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
+
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 )
 
 type providerDebugResponse struct {

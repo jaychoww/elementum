@@ -7,13 +7,13 @@
 package jsonrpc
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/rpc"
 
 	"github.com/anacrolix/sync"
+	"github.com/goccy/go-json"
 )
 
 type clientCodec struct {

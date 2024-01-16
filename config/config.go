@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/anacrolix/sync"
 	"github.com/dustin/go-humanize"
+	"github.com/goccy/go-json"
 	"github.com/op/go-logging"
 	"github.com/pbnjay/memory"
 	"github.com/sanity-io/litter"

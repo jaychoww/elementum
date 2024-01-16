@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"encoding/base32"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/anacrolix/sync"
 	"github.com/dustin/go-humanize"
+	"github.com/goccy/go-json"
 	"github.com/op/go-logging"
 	"github.com/valyala/bytebufferpool"
 	"github.com/zeebo/bencode"

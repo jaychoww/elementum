@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,7 +12,9 @@ import (
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util/ip"
 	"github.com/elgatito/elementum/xbmc"
+
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 )
 
 // PasteProject describes each pastebin project

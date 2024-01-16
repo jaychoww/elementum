@@ -2,7 +2,6 @@ package database
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/anacrolix/missinggo/perf"
+	"github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/elgatito/elementum/config"

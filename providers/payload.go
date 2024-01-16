@@ -2,7 +2,8 @@ package providers
 
 import (
 	"encoding/base64"
-	"encoding/json"
+
+	"github.com/goccy/go-json"
 )
 
 // SearchPayload ...

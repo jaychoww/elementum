@@ -2,7 +2,6 @@ package trakt
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +16,8 @@ import (
 	"github.com/elgatito/elementum/util/ident"
 	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
+
+	"github.com/goccy/go-json"
 	"github.com/jmcvetta/napping"
 	"github.com/op/go-logging"
 )

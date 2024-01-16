@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"math/rand"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/anacrolix/missinggo/perf"
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/sanity-io/litter"
 
 	"github.com/elgatito/elementum/bittorrent"

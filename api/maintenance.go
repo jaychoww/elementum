@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +11,9 @@ import (
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/exit"
 	"github.com/elgatito/elementum/library"
+
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 )
 
 var seekCatched = false

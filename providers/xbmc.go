@@ -1,7 +1,6 @@
 package providers
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/anacrolix/sync"
+	"github.com/goccy/go-json"
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"

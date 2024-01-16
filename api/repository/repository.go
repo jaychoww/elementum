@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -22,6 +21,8 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
+
+	"github.com/goccy/go-json"
 )
 
 // Timestamp represents a time that can be unmarshalled from a JSON string
