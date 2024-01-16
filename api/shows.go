@@ -239,6 +239,10 @@ func TVTraktLists(ctx *gin.Context) {
 	})
 
 	for _, list := range lists {
+		if list == nil || list.User == nil {
+			continue
+		}
+
 		link := URLForXBMC("/shows/trakt/lists/%s/%d", list.User.Ids.Slug, list.IDs.Trakt)
 		menuItem := []string{"LOCALIZE[30520]", fmt.Sprintf("RunPlugin(%s)", URLQuery(URLForXBMC("/menu/shows/add"), "name", list.Name, "link", link))}
 		if MovieMenu.Contains(addAction, &MenuItem{Name: list.Name, Link: link}) {
@@ -481,6 +485,10 @@ func ShowSeasons(ctx *gin.Context) {
 	items := show.Seasons.ToListItems(show)
 	reversedItems := make(xbmc.ListItems, 0)
 	for _, item := range items {
+		if item == nil || item.Info == nil {
+			continue
+		}
+
 		thisURL := URLForXBMC("/show/%d/season/%d/", show.ID, item.Info.Season) + "%s/%s"
 		contextTitle := fmt.Sprintf("%s S%02d", show.OriginalName, item.Info.Season)
 		contextLabel := playLabel
@@ -590,6 +598,10 @@ func ShowEpisodes(ctx *gin.Context) {
 		items := season.Episodes.ToListItems(show, season)
 
 		for _, item := range items {
+			if item == nil || item.Info == nil {
+				continue
+			}
+
 			thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
 				show.ID,
 				seasonNumber,

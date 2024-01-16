@@ -82,6 +82,9 @@ func (r *RateLimiter) Try() (ok bool, remaining time.Duration) {
 		return true, 0
 	}
 	frnt := r.times.Front()
+	if frnt == nil {
+		return false, 0
+	}
 	if diff := now.Sub(frnt.Value.(time.Time)); diff < r.interval {
 		return false, r.interval - diff
 	}

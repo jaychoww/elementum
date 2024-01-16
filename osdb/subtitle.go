@@ -85,7 +85,7 @@ func (subs Subtitles) Best() *Subtitle {
 // NewSubtitleReader ...
 func NewSubtitleReader(s *Subtitle) (io.Reader, error) {
 	resp, err := proxy.GetClient().Get(s.SubDownloadLink)
-	if err != nil {
+	if err != nil || resp == nil {
 		return nil, err
 	}
 	return gzip.NewReader(resp.Body)

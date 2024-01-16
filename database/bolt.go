@@ -175,11 +175,19 @@ func CompressBoltDB(conf *config.Configuration, databasePath, compressPath strin
 
 // GetFilename returns bolt filename
 func (d *BoltDatabase) GetFilename() string {
+	if d == nil {
+		return ""
+	}
+
 	return d.fileName
 }
 
 // Close ...
 func (d *BoltDatabase) Close() {
+	if d == nil {
+		return
+	}
+
 	log.Info("Closing Bolt Database")
 
 	d.IsClosed = true
@@ -214,6 +222,10 @@ func BucketExists(db *bolt.DB, bucket []byte) (res bool) {
 
 // RecreateBucket ...
 func (d *BoltDatabase) RecreateBucket(bucket []byte) error {
+	if d == nil {
+		return nil
+	}
+
 	return d.db.Update(func(tx *bolt.Tx) error {
 		errDrop := tx.DeleteBucket(bucket)
 		if errDrop != nil {
@@ -341,6 +353,10 @@ func CacheCleanup(db *bolt.DB) {
 
 // DeleteWithPrefix ...
 func (d *BoltDatabase) DeleteWithPrefix(bucket []byte, prefix []byte) {
+	if d == nil {
+		return
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -399,6 +415,10 @@ func ParseCacheItem(item []byte) (int64, []byte) {
 
 // GetCachedBytes ...
 func (d *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheValue []byte, err error) {
+	if d == nil {
+		return nil, nil
+	}
+
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -426,12 +446,20 @@ func (d *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheValue []b
 
 // GetCached ...
 func (d *BoltDatabase) GetCached(bucket []byte, key string) (string, error) {
+	if d == nil {
+		return "", nil
+	}
+
 	value, err := d.GetCachedBytes(bucket, key)
 	return string(value), err
 }
 
 // GetCachedBool ...
 func (d *BoltDatabase) GetCachedBool(bucket []byte, key string) (bool, error) {
+	if d == nil {
+		return false, nil
+	}
+
 	value, err := d.GetCachedBytes(bucket, key)
 	if err != nil {
 		return false, err
@@ -442,6 +470,10 @@ func (d *BoltDatabase) GetCachedBool(bucket []byte, key string) (bool, error) {
 
 // GetCachedObject ...
 func (d *BoltDatabase) GetCachedObject(bucket []byte, key string, item interface{}) (err error) {
+	if d == nil {
+		return nil
+	}
+
 	v, err := d.GetCachedBytes(bucket, key)
 	if err != nil || len(v) == 0 {
 		return err
@@ -461,6 +493,10 @@ func (d *BoltDatabase) GetCachedObject(bucket []byte, key string, item interface
 
 // Has checks for existence of a key
 func (d *BoltDatabase) Has(bucket []byte, key string) (ret bool) {
+	if d == nil {
+		return
+	}
+
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -475,6 +511,10 @@ func (d *BoltDatabase) Has(bucket []byte, key string) (ret bool) {
 
 // GetBytes ...
 func (d *BoltDatabase) GetBytes(bucket []byte, key string) (value []byte, err error) {
+	if d == nil {
+		return
+	}
+
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -489,12 +529,20 @@ func (d *BoltDatabase) GetBytes(bucket []byte, key string) (value []byte, err er
 
 // Get ...
 func (d *BoltDatabase) Get(bucket []byte, key string) (string, error) {
+	if d == nil {
+		return "", nil
+	}
+
 	value, err := d.GetBytes(bucket, key)
 	return string(value), err
 }
 
 // GetObject ...
 func (d *BoltDatabase) GetObject(bucket []byte, key string, item interface{}) (err error) {
+	if d == nil {
+		return
+	}
+
 	v, err := d.GetBytes(bucket, key)
 	if err != nil {
 		return err
@@ -514,6 +562,10 @@ func (d *BoltDatabase) GetObject(bucket []byte, key string, item interface{}) (e
 
 // SetCachedBytes ...
 func (d *BoltDatabase) SetCachedBytes(bucket []byte, seconds int, key string, value []byte) error {
+	if d == nil {
+		return nil
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -525,16 +577,28 @@ func (d *BoltDatabase) SetCachedBytes(bucket []byte, seconds int, key string, va
 
 // SetCached ...
 func (d *BoltDatabase) SetCached(bucket []byte, seconds int, key string, value string) error {
+	if d == nil {
+		return nil
+	}
+
 	return d.SetCachedBytes(bucket, seconds, key, []byte(value))
 }
 
 // SetCachedBool ...
 func (d *BoltDatabase) SetCachedBool(bucket []byte, seconds int, key string, value bool) error {
+	if d == nil {
+		return nil
+	}
+
 	return d.SetCachedBytes(bucket, seconds, key, []byte(strconv.FormatBool(value)))
 }
 
 // SetCachedObject ...
 func (d *BoltDatabase) SetCachedObject(bucket []byte, seconds int, key string, item interface{}) error {
+	if d == nil {
+		return nil
+	}
+
 	if buf, err := json.Marshal(item); err != nil {
 		return err
 	} else if err := d.SetCachedBytes(bucket, seconds, key, buf); err != nil {
@@ -546,6 +610,10 @@ func (d *BoltDatabase) SetCachedObject(bucket []byte, seconds int, key string, i
 
 // SetBytes ...
 func (d *BoltDatabase) SetBytes(bucket []byte, key string, value []byte) error {
+	if d == nil {
+		return nil
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -556,11 +624,19 @@ func (d *BoltDatabase) SetBytes(bucket []byte, key string, value []byte) error {
 
 // Set ...
 func (d *BoltDatabase) Set(bucket []byte, key string, value string) error {
+	if d == nil {
+		return nil
+	}
+
 	return d.SetBytes(bucket, key, []byte(value))
 }
 
 // SetObject ...
 func (d *BoltDatabase) SetObject(bucket []byte, key string, item interface{}) error {
+	if d == nil {
+		return nil
+	}
+
 	if buf, err := json.Marshal(item); err != nil {
 		return err
 	} else if err := d.SetBytes(bucket, key, buf); err != nil {
@@ -572,6 +648,10 @@ func (d *BoltDatabase) SetObject(bucket []byte, key string, item interface{}) er
 
 // BatchSet ...
 func (d *BoltDatabase) BatchSet(bucket []byte, objects map[string]string) error {
+	if d == nil {
+		return nil
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -588,6 +668,10 @@ func (d *BoltDatabase) BatchSet(bucket []byte, objects map[string]string) error 
 
 // BatchSetBytes ...
 func (d *BoltDatabase) BatchSetBytes(bucket []byte, objects map[string][]byte) error {
+	if d == nil {
+		return nil
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -604,6 +688,10 @@ func (d *BoltDatabase) BatchSetBytes(bucket []byte, objects map[string][]byte) e
 
 // BatchSetObject ...
 func (d *BoltDatabase) BatchSetObject(bucket []byte, objects map[string]interface{}) error {
+	if d == nil {
+		return nil
+	}
+
 	serialized := map[string][]byte{}
 	for k, item := range objects {
 		buf, err := json.Marshal(item)
@@ -618,6 +706,10 @@ func (d *BoltDatabase) BatchSetObject(bucket []byte, objects map[string]interfac
 
 // Delete ...
 func (d *BoltDatabase) Delete(bucket []byte, key string) error {
+	if d == nil {
+		return nil
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -648,6 +740,10 @@ func (d *BoltDatabase) AsWriter(bucket []byte, key string) *DBWriter {
 
 // Compress ...
 func (d *BoltDatabase) Compress() (err error) {
+	if d == nil {
+		return
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 

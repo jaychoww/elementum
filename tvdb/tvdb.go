@@ -133,7 +133,7 @@ func getShow(tvdbID int, language string) (*Show, error) {
 	}
 
 	resp, err := proxy.GetClient().Get(fmt.Sprintf("%s/%s/series/%d/all/%s.zip", tvdbEndpoint, apiKey, tvdbID, language))
-	if err != nil {
+	if err != nil || resp == nil {
 		return nil, err
 	}
 

@@ -623,6 +623,9 @@ func (s *Service) checkAvailableSpace(xbmcHost *xbmc.XBMCHost, t *Torrent) bool 
 	}
 
 	status := t.GetLastStatus(false)
+	if status == nil {
+		return false
+	}
 
 	totalSize := t.ti.TotalSize()
 	totalDone := status.GetTotalDone()
@@ -979,7 +982,7 @@ func (s *Service) onSaveResumeDataWriter() {
 				}
 
 				status := t.GetLastStatus(false)
-				if !status.GetHasMetadata() || !status.GetNeedSaveResume() {
+				if status == nil || !status.GetHasMetadata() || !status.GetNeedSaveResume() {
 					continue
 				}
 

@@ -137,7 +137,7 @@ func MakeElementumRepositoryAddon(profilePath string) error {
 	}
 
 	resp, err := proxy.GetClient().Get(asset.BrowserDownloadURL)
-	if err != nil {
+	if err != nil || resp == nil {
 		log.Errorf("Could not download zip file: %s", err)
 		return err
 	}

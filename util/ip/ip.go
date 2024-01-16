@@ -35,6 +35,8 @@ func LocalIP() (net.IP, error) {
 				ip = v.IP
 			case *net.IPAddr:
 				ip = v.IP
+			default:
+				continue
 			}
 			v4 := ip.To4()
 			if v4 != nil && (v4[0] == 192 || v4[0] == 172 || v4[0] == 10) {
@@ -104,7 +106,11 @@ func GetListenAddr(confAutoIP bool, confAutoPort bool, confInterfaces string, co
 		for _, iName := range strings.Split(strings.Replace(strings.TrimSpace(confInterfaces), " ", "", -1), ",") {
 			// Check whether value in interfaces string is already an IP value
 			if addr := net.ParseIP(iName); addr != nil {
-				listenIPs = append(listenIPs, addr.To4().String())
+				a := addr.To4()
+				if a == nil {
+					continue
+				}
+				listenIPs = append(listenIPs, a.String())
 				continue
 			}
 
@@ -130,6 +136,8 @@ func GetListenAddr(confAutoIP bool, confAutoPort bool, confInterfaces string, co
 							ip = v.IP
 						case *net.IPAddr:
 							ip = v.IP
+						default:
+							continue
 						}
 
 						v6 := ip.To16()

@@ -209,6 +209,10 @@ func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObj
 
 			lowestYear := 0
 			for _, d := range r.ReleaseDates {
+				if d == nil {
+					continue
+				}
+
 				y, _ := strconv.Atoi(strings.Split(d.ReleaseDate, "-")[0])
 				if y < lowestYear || lowestYear == 0 {
 					lowestYear = y
@@ -308,6 +312,10 @@ func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Sea
 
 // GetEpisodeSearchObject ...
 func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.Episode) *EpisodeSearchObject {
+	if show == nil || episode == nil {
+		return nil
+	}
+
 	seasonCurrent := show.GetSeasonByRealNumber(episode.SeasonNumber)
 	seasonFirst := show.GetSeasonByRealNumber(1)
 

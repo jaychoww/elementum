@@ -41,12 +41,12 @@ func AddMovie(ctx *gin.Context) {
 	force := ctx.DefaultQuery("force", falseType) == trueType
 
 	movie, err := library.AddMovie(tmdbID, force)
-	if err != nil {
+	if err != nil || movie == nil {
 		isErrored := true
-		if err == library.ErrVideoRemoved {
+		if err == library.ErrVideoRemoved && movie != nil {
 			if xbmcHost.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30279];;%s", movie.Title)) {
 				movie, err = library.AddMovie(tmdbID, true)
-				if err == nil {
+				if err == nil && movie != nil {
 					isErrored = false
 				}
 			}
@@ -139,12 +139,12 @@ func AddShow(ctx *gin.Context) {
 	force := ctx.DefaultQuery("force", falseType) == trueType
 
 	show, err := library.AddShow(tmdbID, force)
-	if err != nil {
+	if err != nil || show == nil {
 		isErrored := true
-		if err == library.ErrVideoRemoved {
+		if err == library.ErrVideoRemoved && show != nil {
 			if xbmcHost.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30279];;%s", show.Name)) {
 				show, err = library.AddShow(tmdbID, true)
-				if err == nil {
+				if err == nil && show != nil {
 					isErrored = false
 				}
 			}

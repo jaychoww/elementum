@@ -98,7 +98,7 @@ func Pastebin(ctx *gin.Context) {
 
 	log.Infof("Requesting %s before uploading to pastebin", rurl)
 	resp, err := http.Get(rurl)
-	if err != nil {
+	if err != nil || resp == nil {
 		log.Infof("Could not get %s: %#v", rurl, err)
 		return
 	}
@@ -176,10 +176,16 @@ func Pastebin(ctx *gin.Context) {
 			}
 
 			log.Infof("Got response: %#v", respData)
-			if _, ok := respData["url"]; ok {
-				json.Unmarshal(*respData["url"], &pasteURL)
-			} else if _, ok := respData["key"]; ok {
-				json.Unmarshal(*respData["key"], &pasteURL)
+			if val, ok := respData["url"]; ok && val != nil {
+				if err := json.Unmarshal(*val, &pasteURL); err != nil {
+					log.Warningf("Could not unmarshal response: %s", err)
+					continue
+				}
+			} else if val, ok := respData["key"]; ok && val != nil {
+				if err := json.Unmarshal(*val, &pasteURL); err != nil {
+					log.Warningf("Could not unmarshal response: %s", err)
+					continue
+				}
 				pasteURL = p.BaseURL + "/" + pasteURL
 			}
 		}

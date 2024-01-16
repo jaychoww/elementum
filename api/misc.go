@@ -178,7 +178,10 @@ func SelectNetworkInterface(ctx *gin.Context) {
 				ip = v.IP
 			case *net.IPAddr:
 				ip = v.IP
+			default:
+				continue
 			}
+
 			v4 := ip.To4()
 			if v4 != nil {
 				address = v4.String()
@@ -195,7 +198,7 @@ func SelectNetworkInterface(ctx *gin.Context) {
 	}
 
 	choice := xbmcHost.ListDialog("LOCALIZE[30474]", items...)
-	if choice >= 0 {
+	if choice >= 0 && choice < len(ifaces) {
 		xbmcHost.SetSetting("listen_autodetect_ip", "false")
 		if typeName == "listen" {
 			xbmcHost.SetSetting("listen_interfaces", ifaces[choice].Name)

@@ -60,7 +60,7 @@ func RefreshTrakt() error {
 
 	cacheStore := cache.NewDBStore()
 	lastActivities, err := trakt.GetLastActivities()
-	if err != nil {
+	if err != nil || lastActivities == nil {
 		log.Warningf("Cannot get activities: %s", err)
 		if err == trakt.ErrLocked {
 			go trakt.NotifyLocked()
@@ -251,6 +251,10 @@ func refreshTraktMoviesWatched(xbmcHost *xbmc.XBMCHost, isRefreshNeeded bool) er
 	defer cacheStore.Set(syncCacheKey, &syncPlaycount, cache.LibrarySyncPlaycountExpire)
 
 	for _, m := range current {
+		if m == nil || m.Movie == nil || m.Movie.IDs == nil {
+			continue
+		}
+
 		l.WatchedTraktMovies = addXXItem(l.WatchedTraktMovies, MovieType, m.Movie.IDs)
 
 		if r := getKodiMovieByTraktIDs(m.Movie.IDs); r != nil {
@@ -374,9 +378,17 @@ func refreshTraktShowsWatched(xbmcHost *xbmc.XBMCHost, isRefreshNeeded bool) err
 	}
 
 	for _, s := range current {
+		if s == nil || s.Show == nil || s.Show.IDs == nil {
+			continue
+		}
+
 		tmdbShow := tmdb.GetShowByID(strconv.Itoa(s.Show.IDs.TMDB), config.Get().Language)
 		completedSeasons := 0
 		for _, season := range s.Seasons {
+			if season == nil || season.Episodes == nil {
+				continue
+			}
+
 			if tmdbShow != nil {
 				if sc := tmdbShow.GetSeasonEpisodes(season.Number); sc != 0 && sc == len(season.Episodes) && season.Number > 0 {
 					completedSeasons++
@@ -541,7 +553,7 @@ func getXXItem(ary []uint64, media int, traktID int, tmdbID int, imdbID string, 
 		if imdbID != "" {
 			imdbKey = xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", media, IMDBScraper, imdbID))
 		}
-	} else if media == SeasonType {
+	} else if media == SeasonType && len(ids) > 0 {
 		if traktID != 0 {
 			tmdbKey = xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", media, TraktScraper, traktID, ids[0]))
 		}
@@ -551,7 +563,7 @@ func getXXItem(ary []uint64, media int, traktID int, tmdbID int, imdbID string, 
 		if imdbID != "" {
 			imdbKey = xxhash.Sum64String(fmt.Sprintf("%d_%d_%s_%d", media, IMDBScraper, imdbID, ids[0]))
 		}
-	} else if media == EpisodeType {
+	} else if media == EpisodeType && len(ids) > 0 {
 		if traktID != 0 {
 			traktKey = xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", media, TraktScraper, traktID, ids[0], ids[1]))
 		}
@@ -587,6 +599,10 @@ func getKodiShowByTraktIDs(ids *trakt.IDs) (r *uid.Show) {
 }
 
 func updateMovieWatched(xbmcHost *xbmc.XBMCHost, m *trakt.WatchedMovie, watched bool) {
+	if m == nil || m.Movie == nil || m.Movie.IDs == nil {
+		return
+	}
+
 	var r = getKodiMovieByTraktIDs(m.Movie.IDs)
 	if r == nil {
 		return
@@ -611,6 +627,10 @@ func updateMovieWatched(xbmcHost *xbmc.XBMCHost, m *trakt.WatchedMovie, watched 
 }
 
 func updateShowWatched(xbmcHost *xbmc.XBMCHost, s *trakt.WatchedShow, watched bool) {
+	if s == nil || s.Show == nil || s.Show.IDs == nil {
+		return
+	}
+
 	var r = getKodiShowByTraktIDs(s.Show.IDs)
 	if r == nil {
 		return
@@ -723,7 +743,7 @@ func RefreshTraktPaused(xbmcHost *xbmc.XBMCHost, itemType int, isRefreshNeeded b
 		}
 
 		for _, m := range movies {
-			if m.Movie.IDs.TMDB == 0 || int(m.Progress) <= 0 || m.Movie.Runtime <= 0 {
+			if m == nil || m.Movie == nil || m.Movie.IDs == nil || m.Movie.IDs.TMDB == 0 || int(m.Progress) <= 0 || m.Movie.Runtime <= 0 {
 				continue
 			}
 
@@ -751,7 +771,8 @@ func RefreshTraktPaused(xbmcHost *xbmc.XBMCHost, itemType int, isRefreshNeeded b
 		}
 
 		for _, s := range shows {
-			if s.Show.IDs.TMDB == 0 || int(s.Progress) <= 0 || s.Episode.Runtime <= 0 {
+			if s == nil || s.Show == nil || s.Show.IDs == nil || s.Show.IDs.TMDB == 0 || int(s.Progress) <= 0 ||
+				s.Episode == nil || s.Episode.IDs == nil || s.Episode.Runtime <= 0 {
 				continue
 			}
 
@@ -804,6 +825,10 @@ func RefreshTraktLists(xbmcHost *xbmc.XBMCHost, isRefreshNeeded bool) error {
 
 	lists := trakt.Userlists()
 	for _, list := range lists {
+		if list == nil || list.IDs == nil {
+			continue
+		}
+
 		if err := SyncMoviesList(strconv.Itoa(list.IDs.Trakt), false, isRefreshNeeded); err != nil {
 			continue
 		}

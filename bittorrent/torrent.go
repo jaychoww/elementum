@@ -316,6 +316,9 @@ func (t *Torrent) GetConnections() (int, int, int, int) {
 	}
 
 	ts := t.GetLastStatus(false)
+	if ts == nil {
+		return 0, 0, 0, 0
+	}
 
 	seeds := ts.GetNumSeeds()
 	seedsTotal := max(ts.GetListSeeds(), ts.GetNumComplete())
@@ -333,6 +336,10 @@ func (t *Torrent) GetSpeeds() (down, up int) {
 	}
 
 	ts := t.GetLastStatus(false)
+	if ts == nil {
+		return 0, 0
+	}
+
 	return ts.GetDownloadPayloadRate(), ts.GetUploadPayloadRate()
 }
 
@@ -811,6 +818,10 @@ func (t *Torrent) GetSmartState() int {
 	}
 
 	torrentStatus := t.GetLastStatus(false)
+	if torrentStatus == nil {
+		return StatusQueued
+	}
+
 	progress := float64(torrentStatus.GetProgress()) * 100
 	state := int(torrentStatus.GetState())
 
@@ -890,6 +901,10 @@ func (t *Torrent) piecesProgress(pieces map[int]float64) {
 	t.th.GetDownloadQueue(queue)
 
 	st := t.GetLastStatus(false)
+	if st == nil {
+		return
+	}
+
 	blockSize := st.GetBlockSize()
 	queueSize := queue.Size()
 	for i := 0; i < int(queueSize); i++ {
@@ -934,7 +949,9 @@ func (t *Torrent) GetProgress() float64 {
 // not the whole torrent.
 func (t *Torrent) GetRealProgress() float64 {
 	ts := t.GetLastStatus(false)
-	t.lastProgress = float64(ts.GetProgress()) * 100
+	if ts != nil {
+		t.lastProgress = float64(ts.GetProgress()) * 100
+	}
 
 	return t.lastProgress
 }
@@ -1075,6 +1092,9 @@ func (t *Torrent) InfoHash() string {
 	}
 
 	ts := t.GetLastStatus(false)
+	if ts == nil {
+		return ""
+	}
 	shaHash := ts.GetInfoHash().ToString()
 
 	return hex.EncodeToString([]byte(shaHash))
@@ -1111,7 +1131,7 @@ func (t *Torrent) Title() string {
 	}
 
 	var torrentFile *TorrentFileRaw
-	if errDec := bencode.DecodeBytes(b, &torrentFile); errDec != nil || torrentFile.Title == "" {
+	if errDec := bencode.DecodeBytes(b, &torrentFile); errDec != nil || torrentFile == nil || torrentFile.Title == "" {
 		return t.Name()
 	}
 
@@ -1477,7 +1497,7 @@ func (t *Torrent) updatePieces() error {
 	// is at risk of being collected
 	t.GetLastStatus(true)
 
-	if t.lastStatus.GetState() > lt.TorrentStatusSeeding {
+	if t.lastStatus == nil || t.lastStatus.GetState() > lt.TorrentStatusSeeding {
 		return errors.New("Torrent file has invalid state")
 	}
 
@@ -1563,6 +1583,10 @@ func (t *Torrent) HasMetadata() bool {
 	}
 
 	ts := t.GetLastStatus(false)
+	if ts == nil {
+		return false
+	}
+
 	return ts.GetHasMetadata()
 }
 
@@ -1621,6 +1645,9 @@ func (t *Torrent) GetPaused() bool {
 	}
 
 	ts := t.GetLastStatus(false)
+	if ts == nil {
+		return false
+	}
 
 	return ts.GetPaused()
 }
@@ -1751,10 +1778,11 @@ func (t *Torrent) GetCandidateFiles(btp *Player) ([]*CandidateFile, int, error) 
 
 		if reRar.MatchString(fileName) && size > 10*1024*1024 {
 			t.IsRarArchive = true
+			if btp == nil || btp.xbmcHost == nil {
+				return nil, -1, errors.New("RAR archive detected and download was cancelled")
+			}
 			if !btp.xbmcHost.DialogConfirm("Elementum", "LOCALIZE[30303]") {
-				if btp != nil {
-					btp.notEnoughSpace = true
-				}
+				btp.notEnoughSpace = true
 				return nil, -1, errors.New("RAR archive detected and download was cancelled")
 			}
 		}
@@ -2237,7 +2265,7 @@ func (t *Torrent) UpdateMetadataTitle(title string, in []byte) []byte {
 	defer perf.ScopeTimer()()
 
 	var torrentFile *TorrentFileRaw
-	if err := bencode.DecodeBytes(in, &torrentFile); err != nil {
+	if err := bencode.DecodeBytes(in, &torrentFile); err != nil || torrentFile == nil {
 		return in
 	}
 

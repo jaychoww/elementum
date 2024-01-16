@@ -762,6 +762,9 @@ func RemoveEpisode(tmdbID int, showID int, seasonNumber int, episodeNumber int) 
 	if show == nil {
 		return errors.New("Unable to find show to remove episode")
 	}
+	if removedEpisodes == nil {
+		return errors.New("Channel is closed")
+	}
 
 	showName := show.OriginalName
 	if config.Get().StrmLanguage != config.Get().Language && show.Name != "" {
@@ -1083,6 +1086,10 @@ func SyncMoviesList(listID string, updating bool, isUpdateNeeded bool) (err erro
 func SyncMoviesListAdded(movies []*trakt.Movies, updating, isUpdateNeeded bool, label, listID string) (err error) {
 	var movieIDs []int
 	for _, movie := range movies {
+		if movie == nil || movie.Movie == nil || movie.Movie.IDs == nil {
+			continue
+		}
+
 		title := movie.Movie.Title
 		// Try to resolve TMDB id through IMDB id, if provided
 		if movie.Movie.IDs.TMDB == 0 && len(movie.Movie.IDs.IMDB) > 0 {
@@ -1218,6 +1225,10 @@ func SyncShowsListAdded(shows []*trakt.Shows, updating, isUpdateNeeded bool, lab
 
 	var showIDs []int
 	for _, show := range shows {
+		if show == nil || show.Show == nil || show.Show.IDs == nil {
+			continue
+		}
+
 		title := show.Show.Title
 		// Try to resolve TMDB id through IMDB id, if provided
 		if show.Show.IDs.TMDB == 0 {
@@ -1262,6 +1273,10 @@ func SyncShowsListAdded(shows []*trakt.Shows, updating, isUpdateNeeded bool, lab
 	for k := range showsLastUpdates {
 		found = false
 		for _, s := range shows {
+			if s == nil || s.Show == nil || s.Show.IDs == nil {
+				continue
+			}
+
 			if s.Show.IDs.Trakt == k {
 				found = true
 				break
@@ -1295,8 +1310,16 @@ func DiffTraktMovies(previous, current []*trakt.Movies, isInitialized bool) []*t
 	ret := make([]*trakt.Movies, 0, len(current))
 	found := false
 	for _, ce := range current {
+		if ce == nil || ce.Movie == nil || ce.Movie.IDs == nil {
+			continue
+		}
+
 		found = false
 		for _, pr := range previous {
+			if pr == nil || pr.Movie == nil || pr.Movie.IDs == nil {
+				continue
+			}
+
 			if pr.Movie.IDs.Trakt == ce.Movie.IDs.Trakt {
 				found = true
 				break
@@ -1317,8 +1340,16 @@ func DiffTraktShows(previous, current []*trakt.Shows, isInitialized bool) []*tra
 	ret := make([]*trakt.Shows, 0, len(current))
 	found := false
 	for _, ce := range current {
+		if ce == nil || ce.Show == nil || ce.Show.IDs == nil {
+			continue
+		}
+
 		found = false
 		for _, pr := range previous {
+			if pr == nil || pr.Show == nil || pr.Show.IDs == nil {
+				continue
+			}
+
 			if pr.Show.IDs.Trakt == ce.Show.IDs.Trakt {
 				found = true
 				break
@@ -1379,7 +1410,7 @@ func AddShow(tmdbID string, force bool) (*tmdb.Show, error) {
 	show := tmdb.GetShowByID(tmdbID, config.Get().Language)
 
 	if !force && uid.IsDuplicateShow(tmdbID) {
-		if xbmcHost, err := xbmc.GetLocalXBMCHost(); xbmcHost != nil && err == nil {
+		if xbmcHost, err := xbmc.GetLocalXBMCHost(); xbmcHost != nil && err == nil && show != nil {
 			xbmcHost.Notify("Elementum", fmt.Sprintf("LOCALIZE[30287];;%s", show.Name), config.AddonIcon())
 		}
 		return show, fmt.Errorf("Show already added")

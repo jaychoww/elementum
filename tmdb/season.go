@@ -119,6 +119,10 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 	// If we have empty Names/Overviews then we need to collect Translations separately
 	wg := sync.WaitGroup{}
 	for i, season := range seasons {
+		if season == nil {
+			continue
+		}
+
 		if season.Translations == nil && (season.Name == "" || season.Overview == "" || len(season.Episodes) == 0) {
 			wg.Add(1)
 			go func(idx int, season *Season) {
@@ -217,13 +221,13 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 		}
 	}
 
-	if config.Get().ShowUnwatchedEpisodesNumber {
+	if config.Get().ShowUnwatchedEpisodesNumber && item.Properties != nil {
 		watchedEpisodes := season.countWatchedEpisodesNumber(show)
 		item.Properties.WatchedEpisodes = strconv.Itoa(watchedEpisodes)
 		item.Properties.UnWatchedEpisodes = strconv.Itoa(season.EpisodeCount - watchedEpisodes)
 	}
 
-	if item.Art.Poster == "" {
+	if item.Art != nil && item.Art.Poster == "" {
 		item.Art.Poster = ImageURL(show.PosterPath, "w1280")
 		item.Art.Thumbnail = ImageURL(show.PosterPath, "w1280")
 	}
@@ -306,6 +310,10 @@ func (season *Season) findTranslation(language string) *Translation {
 
 	language = strings.ToLower(language)
 	for _, tr := range season.Translations.Translations {
+		if tr == nil {
+			continue
+		}
+
 		if strings.ToLower(tr.Iso639_1) == language {
 			return tr
 		}

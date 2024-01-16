@@ -26,6 +26,10 @@ func ProviderGetMovie(ctx *gin.Context) {
 	provider := ctx.Params.ByName("provider")
 	log.Infof("Searching links for:", tmdbID)
 	movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
+	if movie == nil {
+		ctx.Error(fmt.Errorf("Unable to get movie %s", tmdbID))
+		return
+	}
 	log.Infof("Resolved %s to %s", tmdbID, movie.Title)
 
 	searcher := providers.NewAddonSearcher(xbmcHost, ctx.Request.Host, provider)
@@ -58,6 +62,11 @@ func ProviderGetEpisode(ctx *gin.Context) {
 	log.Infof("Searching links for TMDB Id:", showID)
 
 	show := tmdb.GetShow(showID, config.Get().Language)
+	if show == nil {
+		ctx.Error(fmt.Errorf("Unable to get show %d", showID))
+		return
+	}
+
 	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons), true)
 	if season == nil {
 		ctx.Error(fmt.Errorf("Unable to get season %d", seasonNumber))

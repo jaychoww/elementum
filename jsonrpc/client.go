@@ -100,7 +100,7 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 }
 
 func (c *clientCodec) ReadResponseBody(x interface{}) error {
-	if x == nil {
+	if x == nil || c == nil || c.resp.Result == nil {
 		return nil
 	}
 	return json.Unmarshal(*c.resp.Result, x)

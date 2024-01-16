@@ -103,9 +103,11 @@ func (r *Request) Do() (err error) {
 		for {
 			resp, err = r.API.GetSession().Send(req)
 
-			r.ResponseStatusCode = resp.Status()
-			r.ResponseStatus = resp.HttpResponse().Status
-			r.ResponseHeader = resp.HttpResponse().Header
+			if resp != nil {
+				r.ResponseStatusCode = resp.Status()
+				r.ResponseStatus = resp.HttpResponse().Status
+				r.ResponseHeader = resp.HttpResponse().Header
+			}
 
 			if err != nil {
 				log.Errorf("Failed to make request to %s for %s with %+v: %s", r.URL, r.Description, r.Params, err)
@@ -115,7 +117,7 @@ func (r *Request) Do() (err error) {
 				err = util.ErrExceeded
 				return err
 			} else if r.ResponseStatusCode == 404 {
-				log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, resp.Status())
+				log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, r.ResponseStatus)
 				err = util.ErrNotFound
 				return err
 			} else if r.ResponseStatusCode == 403 && r.API.RetriesLeft > 0 {
@@ -123,7 +125,7 @@ func (r *Request) Do() (err error) {
 				log.Warningf("Not authorized to get %s with %+v on %s, having %d retries left ...", r.Description, r.Params, r.URL, r.API.RetriesLeft)
 				continue
 			} else if r.ResponseStatusCode < 200 || r.ResponseStatusCode >= 300 {
-				log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, resp.Status())
+				log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, r.ResponseStatus)
 				err = util.ErrHTTP
 				return err
 			}

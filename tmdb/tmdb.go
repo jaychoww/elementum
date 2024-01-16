@@ -619,6 +619,10 @@ func (credits *Credits) GetCastMembers() []xbmc.ListItemCastMember {
 func (credits *Credits) GetDirectors() []string {
 	directors := make([]string, 0)
 	for _, crew := range credits.Crew {
+		if crew == nil {
+			continue
+		}
+
 		if crew.Job == "Director" {
 			directors = append(directors, crew.Name)
 		}

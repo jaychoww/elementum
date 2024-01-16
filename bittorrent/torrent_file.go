@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/base32"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -397,6 +398,9 @@ func (t *TorrentFile) LoadFromBytes(in []byte) error {
 	if err := bencode.DecodeBytes(in, &torrentFile); err != nil {
 		return err
 	}
+	if torrentFile == nil {
+		return errors.New("Decoding failed")
+	}
 
 	if t.InfoHash == "" {
 		hasher := sha1.New()
@@ -424,10 +428,12 @@ func (t *TorrentFile) LoadFromBytes(in []byte) error {
 
 	if len(t.Trackers) == 0 {
 		t.Trackers = append(t.Trackers, torrentFile.Announce)
-		for _, trackers := range torrentFile.AnnounceList {
-			for _, tracker := range trackers {
-				if !util.StringSliceContains(t.Trackers, tracker) {
-					t.Trackers = append(t.Trackers, tracker)
+		if torrentFile.AnnounceList != nil {
+			for _, trackers := range torrentFile.AnnounceList {
+				for _, tracker := range trackers {
+					if !util.StringSliceContains(t.Trackers, tracker) {
+						t.Trackers = append(t.Trackers, tracker)
+					}
 				}
 			}
 		}
@@ -487,7 +493,7 @@ func (t *TorrentFile) Download() ([]byte, error) {
 	}
 
 	resp, err := proxy.GetClient().Do(req)
-	if err != nil {
+	if err != nil || resp == nil {
 		return nil, err
 	} else if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Request %s failed with code: %d", uri, resp.StatusCode)
@@ -690,7 +696,7 @@ func (t *TorrentFile) UpdateTorrentTrackers() error {
 		}
 
 		for _, tracker := range t.Trackers {
-			if !torrentFile.HasAnnounce(tracker) {
+			if torrentFile != nil && torrentFile.AnnounceList != nil && !torrentFile.HasAnnounce(tracker) {
 				torrentFile.AnnounceList = append(torrentFile.AnnounceList, []string{tracker})
 			}
 		}

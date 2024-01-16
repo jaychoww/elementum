@@ -115,6 +115,9 @@ func (h *XBMCHost) VideoLibraryGetElementumMovies() (movies *VideoLibraryMovies,
 		return
 	}
 
+	if movies == nil || movies.Limits == nil {
+		return
+	}
 	if movies != nil && movies.Limits != nil && movies.Limits.Total == 0 {
 		return
 	}
@@ -230,7 +233,7 @@ func (h *XBMCHost) VideoLibraryGetElementumShows() (shows *VideoLibraryShows, er
 		return
 	}
 
-	if shows != nil && shows.Limits != nil && shows.Limits.Total == 0 {
+	if shows == nil || (shows.Limits != nil && shows.Limits.Total == 0) {
 		return
 	}
 

@@ -81,7 +81,7 @@ func CustomDial(network, addr string) (net.Conn, error) {
 			if ips, err := resolve(addrs[0]); err == nil && len(ips) > 0 {
 				for _, i := range ips {
 					if config.Get().InternalDNSSkipIPv6 {
-						if ip := net.ParseIP(i); ip.To4() == nil {
+						if ip := net.ParseIP(i); ip == nil || ip.To4() == nil {
 							continue
 						}
 					}

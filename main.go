@@ -172,7 +172,11 @@ func main() {
 
 	lock, err := ensureSingleInstance(conf)
 	if err != nil {
-		log.Warningf("Unable to acquire lock %q: %v, exiting...", lock.File, err)
+		if lock != nil {
+			log.Warningf("Unable to acquire lock %q: %s, exiting...", lock.File, err)
+		} else {
+			log.Warningf("Unable to acquire lock: %s, exiting...", err)
+		}
 		exit.Exit(exit.ExitCodeError)
 	}
 	if lock != nil {

@@ -334,7 +334,7 @@ func processLinks(xbmcHost *xbmc.XBMCHost, torrentsChan chan *bittorrent.Torrent
 
 		var torrentFile *bittorrent.TorrentFileRaw
 		err = bencode.DecodeBytes(in, &torrentFile)
-		if err != nil {
+		if err != nil || torrentFile == nil {
 			log.Debugf("Cannot decode torrent file: %s", err)
 			continue
 		}

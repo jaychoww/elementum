@@ -97,7 +97,7 @@ func writeResponse(w http.ResponseWriter, url string) {
 	w.Write([]byte("Response for url: " + url + "\n\n"))
 
 	resp, err := http.Get(fmt.Sprintf("http://%s:%d%s", ip.GetLocalHost(), config.Args.LocalPort, url))
-	if err != nil {
+	if err != nil || resp == nil {
 		return
 	}
 	defer resp.Body.Close()

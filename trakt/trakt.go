@@ -741,7 +741,7 @@ func TokenRefreshHandler() {
 				}
 
 				err := req.Do()
-				if err != nil {
+				if err != nil || token == nil {
 					if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 						xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 					}
@@ -766,7 +766,7 @@ func TokenRefreshHandler() {
 // Authorize ...
 func Authorize(fromSettings bool) error {
 	code, err := GetCode()
-	if err != nil {
+	if err != nil || code == nil {
 		log.Error("Could not get authorization code from Trakt.tv: %s", err)
 		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
 			xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -849,7 +849,11 @@ func Authorize(fromSettings bool) error {
 	}(code)
 
 	if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
-		if !xbmcHost.Dialog(xbmcHost.GetLocalizedString(30646), fmt.Sprintf(xbmcHost.GetLocalizedString(30649), code.VerificationURL, code.UserCode)) {
+		if code != nil {
+			if !xbmcHost.Dialog(xbmcHost.GetLocalizedString(30646), fmt.Sprintf(xbmcHost.GetLocalizedString(30649), code.VerificationURL, code.UserCode)) {
+				return errors.New("Authentication canceled")
+			}
+		} else {
 			return errors.New("Authentication canceled")
 		}
 	}
@@ -1293,6 +1297,10 @@ func DiffWatchedShows(current, previous []*WatchedShow) (diff []*WatchedShow) {
 	var season *WatchedSeason
 
 	for _, previousShow := range previous {
+		if previousShow == nil || previousShow.Show == nil || previousShow.Show.IDs == nil {
+			continue
+		}
+
 		foundShow = false
 		foundSeason = false
 		foundEpisode = false
@@ -1300,6 +1308,10 @@ func DiffWatchedShows(current, previous []*WatchedShow) (diff []*WatchedShow) {
 		show = nil
 
 		for _, currentShow := range current {
+			if currentShow == nil || currentShow.Show == nil || currentShow.Show.IDs == nil {
+				continue
+			}
+
 			season = nil
 
 			if previousShow.Show.IDs.Trakt == currentShow.Show.IDs.Trakt {
@@ -1363,8 +1375,16 @@ func DiffWatchedMovies(previous, current []*WatchedMovie, checkDate bool) []*Wat
 	ret := make([]*WatchedMovie, 0, len(current))
 	found := false
 	for _, ce := range current {
+		if ce == nil || ce.Movie == nil || ce.Movie.IDs == nil {
+			continue
+		}
+
 		found = false
 		for _, pr := range previous {
+			if pr == nil || pr.Movie == nil || pr.Movie.IDs == nil {
+				continue
+			}
+
 			if pr.Movie.IDs.Trakt == ce.Movie.IDs.Trakt && (!checkDate || !ce.LastWatchedAt.After(pr.LastWatchedAt)) {
 				found = true
 				break
@@ -1384,8 +1404,16 @@ func DiffMovies(previous, current []*Movies) []*Movies {
 	ret := make([]*Movies, 0, len(current))
 	found := false
 	for _, ce := range current {
+		if ce == nil || ce.Movie == nil || ce.Movie.IDs == nil {
+			continue
+		}
+
 		found = false
 		for _, pr := range previous {
+			if pr == nil || pr.Movie == nil || pr.Movie.IDs == nil {
+				continue
+			}
+
 			if pr.Movie.IDs.Trakt == ce.Movie.IDs.Trakt {
 				found = true
 				break

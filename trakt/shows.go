@@ -752,7 +752,7 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 	cacheStore := cache.NewDBStore()
 
 	lastActivities, err := GetLastActivities()
-	if err != nil {
+	if err != nil || lastActivities == nil {
 		log.Warningf("Cannot get activities: %s", err)
 		return nil, err
 	}
@@ -845,6 +845,10 @@ func GetHiddenShowsMap(section string) map[int]bool {
 
 	hiddenShowsProgress, _ := ListHiddenShows(section, false)
 	for _, show := range hiddenShowsProgress {
+		if show == nil || show.Show == nil || show.Show.IDs == nil {
+			continue
+		}
+
 		hiddenShowsMap[show.Show.IDs.Trakt] = true
 	}
 
@@ -860,13 +864,14 @@ func FilterHiddenProgressShows(inShows []*ProgressShow) (outShows []*ProgressSho
 	hiddenShowsMap := GetHiddenShowsMap("progress_watched")
 
 	for _, s := range inShows {
-		if s != nil {
-			if !hiddenShowsMap[s.Show.IDs.Trakt] {
-				// append to new instead of delete in old b/c delete is O(n)
-				outShows = append(outShows, s)
-			} else {
-				log.Debugf("Will suppress hidden show: %s", s.Show.Title)
-			}
+		if s == nil || s.Show == nil || s.Show.IDs == nil {
+			continue
+		}
+		if !hiddenShowsMap[s.Show.IDs.Trakt] {
+			// append to new instead of delete in old b/c delete is O(n)
+			outShows = append(outShows, s)
+		} else {
+			log.Debugf("Will suppress hidden show: %s", s.Show.Title)
 		}
 	}
 
@@ -947,6 +952,11 @@ func (show *Show) ToListItem() (item *xbmc.ListItem) {
 	}
 	if item == nil {
 		show = setShowFanart(show)
+
+		if show == nil || show.IDs == nil || show.Images == nil {
+			return
+		}
+
 		item = &xbmc.ListItem{
 			Label: show.Title,
 			Info: &xbmc.ListItemInfo{
@@ -991,7 +1001,7 @@ func (show *Show) ToListItem() (item *xbmc.ListItem) {
 		item.Info.DBID = ls.UIDs.Kodi
 	}
 
-	if config.Get().ShowUnwatchedEpisodesNumber && config.Get().ForceUseTrakt {
+	if config.Get().ShowUnwatchedEpisodesNumber && config.Get().ForceUseTrakt && item.Properties != nil {
 		item.Properties.TotalSeasons = strconv.Itoa(show.CountRealSeasons())
 
 		airedEpisodes := show.countEpisodesNumber()
@@ -1002,13 +1012,15 @@ func (show *Show) ToListItem() (item *xbmc.ListItem) {
 		item.Properties.UnWatchedEpisodes = strconv.Itoa(airedEpisodes - watchedEpisodes)
 	}
 
-	item.Thumbnail = item.Art.Poster
-	// item.Art.Thumbnail = item.Art.Poster
+	if item.Art != nil {
+		item.Thumbnail = item.Art.Poster
+		// item.Art.Thumbnail = item.Art.Poster
 
-	// if fa := fanart.GetShow(util.StrInterfaceToInt(show.IDs.TVDB)); fa != nil {
-	// 	item.Art = fa.ToListItemArt(item.Art)
-	// 	item.Thumbnail = item.Art.Thumbnail
-	// }
+		// if fa := fanart.GetShow(util.StrInterfaceToInt(show.IDs.TVDB)); fa != nil {
+		// 	item.Art = fa.ToListItemArt(item.Art)
+		// 	item.Thumbnail = item.Art.Thumbnail
+		// }
+	}
 
 	if len(item.Info.Trailer) == 0 {
 		item.Info.Trailer = util.TrailerURL(show.Trailer)
@@ -1020,6 +1032,10 @@ func (show *Show) ToListItem() (item *xbmc.ListItem) {
 // ToListItem ...
 func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 	defer perf.ScopeTimer()()
+
+	if show == nil || show.IDs == nil || show.Images == nil || episode == nil || episode.IDs == nil {
+		return nil
+	}
 
 	episodeLabel := episode.Title
 	if config.Get().AddEpisodeNumbers {

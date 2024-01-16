@@ -223,11 +223,15 @@ func (btp *Player) resumeTorrent() error {
 
 // PlayURL ...
 func (btp *Player) PlayURL() string {
+	path := ""
+	if btp.chosenFile != nil {
+		path = btp.chosenFile.Path
+	}
 	if btp.t.IsRarArchive {
-		extractedPath := filepath.Join(filepath.Dir(btp.chosenFile.Path), "extracted", btp.extracted)
+		extractedPath := filepath.Join(filepath.Dir(path), "extracted", btp.extracted)
 		return util.EncodeFileURL(extractedPath)
 	}
-	return util.EncodeFileURL(btp.chosenFile.Path)
+	return util.EncodeFileURL(path)
 }
 
 // Buffer ...
@@ -587,7 +591,12 @@ func (btp *Player) updateBufferDialog() (bool, error) {
 	defer perf.ScopeTimer()()
 
 	// Handle "Checking" state for resumed downloads
-	if btp.t.GetLastStatus(false).GetState() == StatusChecking || btp.t.IsRarArchive {
+	state := btp.t.GetLastStatus(false)
+	if state == nil {
+		return false, nil
+	}
+
+	if state.GetState() == StatusChecking || btp.t.IsRarArchive {
 		progress := btp.t.GetBufferProgress()
 		line1, line2, line3 := btp.statusStrings(progress, btp.t.GetLastStatus(false))
 		if btp.dialogProgress != nil {
@@ -595,6 +604,12 @@ func (btp *Player) updateBufferDialog() (bool, error) {
 		}
 
 		if btp.t.IsRarArchive && progress >= 100 {
+			if btp.chosenFile == nil {
+				btp.setRateLimiting(true)
+				btp.bufferEvents.Signal()
+				return false, fmt.Errorf("File not chosen")
+			}
+
 			archivePath := filepath.Join(btp.s.config.DownloadPath, btp.chosenFile.Path)
 			destPath := filepath.Join(btp.s.config.DownloadPath, filepath.Dir(btp.chosenFile.Path), "extracted")
 
@@ -854,7 +869,7 @@ func (btp *Player) Params() *PlayerParams {
 func (btp *Player) UpdateWatched() {
 	log.Debugf("Updating Watched state: %s", litter.Sdump(btp.p))
 
-	if btp.p.WatchedProgress == 0 {
+	if btp.p.WatchedProgress == 0 || btp.chosenFile == nil {
 		return
 	}
 
@@ -1125,7 +1140,7 @@ func (btp *Player) findNextFile() {
 
 // InitAudio ...
 func (btp *Player) InitAudio() {
-	if btp.p.DoneAudio {
+	if btp.p.DoneAudio || btp.chosenFile == nil {
 		return
 	}
 
@@ -1204,6 +1219,10 @@ func (btp *Player) DownloadSubtitles() {
 
 // SetSubtitles ...
 func (btp *Player) SetSubtitles() {
+	if btp.chosenFile == nil {
+		return
+	}
+
 	filePath := btp.chosenFile.Path
 	extension := filepath.Ext(filePath)
 
@@ -1293,7 +1312,7 @@ func (btp *Player) processUpNextShow() (upnext.Payload, error) {
 	res.CurrentEpisode = btp.processUpNextEpisode(show, season, episode)
 
 	show, season, episode, err = getNextShowSeasonEpisode(btp.p.ShowID, btp.p.Season, btp.p.Episode)
-	if err != nil {
+	if err != nil || show == nil || episode == nil {
 		log.Warningf("Cannot prepare next UpNext item: %s", err)
 		return res, err
 	}
@@ -1355,7 +1374,15 @@ func (btp *Player) processUpNextQuery() (upnext.Payload, error) {
 }
 
 func (btp *Player) processUpNextEpisode(show *tmdb.Show, season *tmdb.Season, episode *tmdb.Episode) upnext.Episode {
+	if show == nil || episode == nil {
+		return upnext.Episode{}
+	}
+
 	li := episode.ToListItem(show, season)
+	if li.Art == nil {
+		return upnext.Episode{}
+	}
+
 	runtime := 1800
 	if len(show.EpisodeRunTime) > 0 {
 		runtime = show.EpisodeRunTime[len(show.EpisodeRunTime)-1] * 60

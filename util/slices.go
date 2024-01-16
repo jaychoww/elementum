@@ -72,6 +72,10 @@ func Difference(arrs ...interface{}) (reflect.Value, bool) {
 			numElems++
 		}
 	}
+	if len(arrs) == 0 {
+		return reflect.Value{}, false
+	}
+
 	out := reflect.MakeSlice(reflect.TypeOf(arrs[0]), numElems, numElems)
 	i := 0
 	for key, val := range tempMap {

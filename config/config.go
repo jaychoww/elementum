@@ -935,7 +935,7 @@ func getKodiBufferSize(xbmcHost *xbmc.XBMCHost) int {
 	b, _ := io.ReadAll(xmlFile)
 
 	var as *xbmc.AdvancedSettings
-	if err = xml.Unmarshal(b, &as); err != nil {
+	if err = xml.Unmarshal(b, &as); err != nil || as == nil {
 		return 0
 	}
 

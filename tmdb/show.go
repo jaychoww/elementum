@@ -523,7 +523,7 @@ func (show *Show) ShowInfo(episode *Episode) (an int, st string) {
 
 // ShowInfoWithTVDBShow ...
 func (show *Show) ShowInfoWithTVDBShow(episode *Episode, tvdbShow *tvdb.Show) (an int, st string) {
-	if tvdbShow != nil && episode.SeasonNumber > 0 && len(tvdbShow.Seasons) >= episode.SeasonNumber {
+	if tvdbShow != nil && episode != nil && episode.SeasonNumber > 0 && len(tvdbShow.Seasons) >= episode.SeasonNumber {
 		if tvdbSeason := tvdbShow.GetSeason(episode.SeasonNumber); tvdbSeason != nil && len(tvdbSeason.Episodes) >= episode.EpisodeNumber {
 			if tvdbEpisode := tvdbSeason.GetEpisode(episode.EpisodeNumber); tvdbEpisode != nil && tvdbEpisode.AbsoluteNumber > 0 {
 				an = tvdbEpisode.AbsoluteNumber

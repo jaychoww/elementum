@@ -24,6 +24,9 @@ func GetStorm() *StormDatabase {
 
 // GetStormDB returns common database
 func GetStormDB() *storm.DB {
+	if stormDatabase == nil {
+		return nil
+	}
 	return stormDatabase.db
 }
 
@@ -87,6 +90,10 @@ func CreateStormDB(conf *config.Configuration, databasePath, backupPath string) 
 
 // MaintenanceRefreshHandler ...
 func (d *StormDatabase) MaintenanceRefreshHandler() {
+	if d == nil || d.db == nil {
+		return
+	}
+
 	CreateBackup(d.db.Bolt, d.backupFilePath)
 
 	tickerBackup := time.NewTicker(backupPeriod)
@@ -110,6 +117,10 @@ func (d *StormDatabase) MaintenanceRefreshHandler() {
 
 // Close ...
 func (d *StormDatabase) Close() {
+	if d == nil || d.db == nil {
+		return
+	}
+
 	log.Info("Closing Storm Database")
 
 	d.IsClosed = true
@@ -125,11 +136,19 @@ func (d *StormDatabase) Close() {
 
 // GetFilename returns bolt filename
 func (d *Database) GetFilename() string {
+	if d == nil {
+		return ""
+	}
+
 	return d.fileName
 }
 
 // AddSearchHistory adds query to search history, according to media type
 func (d *StormDatabase) AddSearchHistory(historyType, query string) {
+	if d == nil || d.db == nil {
+		return
+	}
+
 	defer perf.ScopeTimer()()
 
 	var qh QueryHistory
@@ -158,6 +177,10 @@ func (d *StormDatabase) AddSearchHistory(historyType, query string) {
 
 // CleanSearchHistory cleans search history for selected media type
 func (d *StormDatabase) CleanSearchHistory(historyType string) {
+	if d == nil || d.db == nil {
+		return
+	}
+
 	defer perf.ScopeTimer()()
 
 	var qs []QueryHistory
@@ -170,6 +193,10 @@ func (d *StormDatabase) CleanSearchHistory(historyType string) {
 
 // RemoveSearchHistory removes query from the history
 func (d *StormDatabase) RemoveSearchHistory(historyType, query string) {
+	if d == nil || d.db == nil {
+		return
+	}
+
 	defer perf.ScopeTimer()()
 
 	var qs []QueryHistory
@@ -182,6 +209,10 @@ func (d *StormDatabase) RemoveSearchHistory(historyType, query string) {
 
 // CleanupTorrentLink ...
 func (d *StormDatabase) CleanupTorrentLink(infoHash string) {
+	if d == nil || d.db == nil {
+		return
+	}
+
 	defer perf.ScopeTimer()()
 
 	var oldTi TorrentAssignItem
@@ -195,6 +226,10 @@ func (d *StormDatabase) CleanupTorrentLink(infoHash string) {
 
 // AddTorrentLink saves link between torrent file and tmdbID entry
 func (d *StormDatabase) AddTorrentLink(tmdbID, infoHash string, b []byte, force bool) {
+	if d == nil || d.db == nil {
+		return
+	}
+
 	// Dummy check if infohash is real
 	if len(infoHash) == 0 || infoHash == "0000000000000000000000000000000000000000" {
 		return
@@ -258,6 +293,10 @@ func (d *StormDatabase) AddTorrentLink(tmdbID, infoHash string, b []byte, force 
 
 // UpdateTorrentMetadata updates bytes for specific InfoHash
 func (d *StormDatabase) UpdateTorrentMetadata(infoHash string, b []byte) {
+	if d == nil || d.db == nil {
+		return
+	}
+
 	// Dummy check if infohash is real
 	if len(infoHash) == 0 || infoHash == "0000000000000000000000000000000000000000" {
 		return
@@ -287,6 +326,10 @@ func (d *StormDatabase) UpdateTorrentMetadata(infoHash string, b []byte) {
 
 // GetBTItem ...
 func (d *StormDatabase) GetBTItem(infoHash string) *BTItem {
+	if d == nil || d.db == nil {
+		return nil
+	}
+
 	defer perf.ScopeTimer()()
 
 	item := &BTItem{}
@@ -299,6 +342,10 @@ func (d *StormDatabase) GetBTItem(infoHash string) *BTItem {
 
 // UpdateBTItemStatus ...
 func (d *StormDatabase) UpdateBTItemStatus(infoHash string, status int) error {
+	if d == nil || d.db == nil {
+		return errors.New("Database not initialized")
+	}
+
 	defer perf.ScopeTimer()()
 
 	item := BTItem{}
@@ -312,6 +359,10 @@ func (d *StormDatabase) UpdateBTItemStatus(infoHash string, status int) error {
 
 // UpdateBTItem ...
 func (d *StormDatabase) UpdateBTItem(infoHash string, mediaID int, mediaType string, files []string, query string, infos ...int) error {
+	if d == nil || d.db == nil {
+		return errors.New("Database not initialized")
+	}
+
 	defer perf.ScopeTimer()()
 
 	item := BTItem{
@@ -342,6 +393,10 @@ func (d *StormDatabase) UpdateBTItem(infoHash string, mediaID int, mediaType str
 
 // UpdateBTItemFiles ...
 func (d *StormDatabase) UpdateBTItemFiles(infoHash string, files []string) error {
+	if d == nil || d.db == nil {
+		return errors.New("Database not initialized")
+	}
+
 	defer perf.ScopeTimer()()
 
 	item := BTItem{}
@@ -355,6 +410,10 @@ func (d *StormDatabase) UpdateBTItemFiles(infoHash string, files []string) error
 
 // DeleteBTItem ...
 func (d *StormDatabase) DeleteBTItem(infoHash string) error {
+	if d == nil || d.db == nil {
+		return errors.New("Database not initialized")
+	}
+
 	defer perf.ScopeTimer()()
 
 	return d.db.Delete(BTItemBucket, infoHash)
@@ -362,6 +421,10 @@ func (d *StormDatabase) DeleteBTItem(infoHash string) error {
 
 // AddTorrentHistory saves last used torrent
 func (d *StormDatabase) AddTorrentHistory(infoHash, name string, b []byte) {
+	if d == nil || d.db == nil {
+		return
+	}
+
 	defer perf.ScopeTimer()()
 
 	if !config.Get().UseTorrentHistory {
@@ -402,6 +465,10 @@ func (d *StormDatabase) AddTorrentHistory(infoHash, name string, b []byte) {
 
 // Compress ...
 func (d *StormDatabase) Compress() (err error) {
+	if d == nil || d.db == nil {
+		return errors.New("Database not initialized")
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 

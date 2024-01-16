@@ -338,6 +338,10 @@ func GetBestShowImage(season string, isStrict bool, old string, lists ...[]*Show
 
 // ToListItemArt ...
 func (fa *Movie) ToListItemArt(old *xbmc.ListItemArt) *xbmc.ListItemArt {
+	if old == nil {
+		old = &xbmc.ListItemArt{}
+	}
+
 	availableArtworks := &xbmc.Artworks{
 		Poster:    GetMultipleImage(old.Poster, fa.MoviePoster),
 		Banner:    GetMultipleImage(old.Banner, fa.MovieBanner),
@@ -365,6 +369,10 @@ func (fa *Movie) ToListItemArt(old *xbmc.ListItemArt) *xbmc.ListItemArt {
 
 // ToListItemArt ...
 func (fa *Show) ToListItemArt(old *xbmc.ListItemArt) *xbmc.ListItemArt {
+	if old == nil {
+		old = &xbmc.ListItemArt{}
+	}
+
 	availableArtworks := &xbmc.Artworks{
 		Poster:    GetMultipleShowImage("", old.Poster, fa.TVPoster),
 		Banner:    GetMultipleShowImage("", old.Banner, fa.TVBanner),
@@ -391,6 +399,9 @@ func (fa *Show) ToListItemArt(old *xbmc.ListItemArt) *xbmc.ListItemArt {
 // ToSeasonListItemArt ...
 func (fa *Show) ToSeasonListItemArt(season int, old *xbmc.ListItemArt) *xbmc.ListItemArt {
 	s := strconv.Itoa(season)
+	if old == nil {
+		old = &xbmc.ListItemArt{}
+	}
 
 	return &xbmc.ListItemArt{
 		TvShowPoster: GetBestShowImage("", true, old.Poster, fa.SeasonPoster, fa.TVPoster),
@@ -408,6 +419,9 @@ func (fa *Show) ToSeasonListItemArt(season int, old *xbmc.ListItemArt) *xbmc.Lis
 // ToEpisodeListItemArt ...
 func (fa *Show) ToEpisodeListItemArt(season int, old *xbmc.ListItemArt) *xbmc.ListItemArt {
 	s := strconv.Itoa(season)
+	if old == nil {
+		old = &xbmc.ListItemArt{}
+	}
 
 	return &xbmc.ListItemArt{
 		TvShowPoster: GetBestShowImage("", true, old.Poster, fa.SeasonPoster, fa.TVPoster),

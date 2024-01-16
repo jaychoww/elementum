@@ -23,7 +23,7 @@ import (
 )
 
 func inMoviesWatchlist(tmdbID int) bool {
-	if !config.Get().TraktAuthorized {
+	if !config.Get().TraktAuthorized || !config.Get().TraktSyncEnabled {
 		return false
 	}
 
@@ -36,7 +36,7 @@ func inMoviesWatchlist(tmdbID int) bool {
 	}
 
 	for _, movie := range movies {
-		if tmdbID == movie.Movie.IDs.TMDB {
+		if movie.Movie != nil && movie.Movie.IDs != nil && tmdbID == movie.Movie.IDs.TMDB {
 			return true
 		}
 	}
@@ -44,7 +44,7 @@ func inMoviesWatchlist(tmdbID int) bool {
 }
 
 func inShowsWatchlist(tmdbID int) bool {
-	if !config.Get().TraktAuthorized {
+	if !config.Get().TraktAuthorized || !config.Get().TraktSyncEnabled {
 		return false
 	}
 
@@ -57,7 +57,7 @@ func inShowsWatchlist(tmdbID int) bool {
 	}
 
 	for _, show := range shows {
-		if tmdbID == show.Show.IDs.TMDB {
+		if show.Show != nil && show.Show.IDs != nil && tmdbID == show.Show.IDs.TMDB {
 			return true
 		}
 	}
@@ -65,7 +65,7 @@ func inShowsWatchlist(tmdbID int) bool {
 }
 
 func inMoviesCollection(tmdbID int) bool {
-	if !config.Get().TraktAuthorized {
+	if !config.Get().TraktAuthorized || !config.Get().TraktSyncEnabled {
 		return false
 	}
 
@@ -89,7 +89,7 @@ func inMoviesCollection(tmdbID int) bool {
 }
 
 func inShowsCollection(tmdbID int) bool {
-	if !config.Get().TraktAuthorized {
+	if !config.Get().TraktAuthorized || !config.Get().TraktSyncEnabled {
 		return false
 	}
 
@@ -560,10 +560,6 @@ func TraktPopularMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("popular", pageParam)
 
-	defer func() {
-		go trakt.TopMovies("popular", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -596,10 +592,6 @@ func TraktTrendingMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("trending", pageParam)
 
-	defer func() {
-		go trakt.TopMovies("trending", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -615,10 +607,6 @@ func TraktMostPlayedMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("played", pageParam)
-
-	defer func() {
-		go trakt.TopMovies("played", nextPage(pageParam))
-	}()
 
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -636,10 +624,6 @@ func TraktMostWatchedMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("watched", pageParam)
 
-	defer func() {
-		go trakt.TopMovies("watched", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -656,10 +640,6 @@ func TraktMostCollectedMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("collected", pageParam)
 
-	defer func() {
-		go trakt.TopMovies("collected", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -675,10 +655,6 @@ func TraktMostAnticipatedMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("anticipated", pageParam)
-
-	defer func() {
-		go trakt.TopMovies("anticipated", nextPage(pageParam))
-	}()
 
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -794,6 +770,10 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 		}
 
 		item := showListing.Show.ToListItem()
+		if item == nil || item.Info == nil {
+			continue
+		}
+
 		tmdbID := strconv.Itoa(showListing.Show.IDs.TMDB)
 
 		item.Path = URLForXBMC("/show/%d/seasons", showListing.Show.IDs.TMDB)
@@ -862,10 +842,6 @@ func TraktPopularShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("popular", pageParam)
 
-	defer func() {
-		go trakt.TopShows("popular", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -898,10 +874,6 @@ func TraktTrendingShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("trending", pageParam)
 
-	defer func() {
-		go trakt.TopShows("trending", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -917,10 +889,6 @@ func TraktMostPlayedShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("played", pageParam)
-
-	defer func() {
-		go trakt.TopShows("played", nextPage(pageParam))
-	}()
 
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -938,10 +906,6 @@ func TraktMostWatchedShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("watched", pageParam)
 
-	defer func() {
-		go trakt.TopShows("watched", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -958,10 +922,6 @@ func TraktMostCollectedShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("collected", pageParam)
 
-	defer func() {
-		go trakt.TopShows("collected", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -977,10 +937,6 @@ func TraktMostAnticipatedShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("anticipated", pageParam)
-
-	defer func() {
-		go trakt.TopShows("anticipated", nextPage(pageParam))
-	}()
 
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -1002,10 +958,6 @@ func TraktMyShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("my/shows", pageParam)
 
-	defer func() {
-		go trakt.CalendarShows("my/shows", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -1021,10 +973,6 @@ func TraktMyNewShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("my/shows/new", pageParam)
-
-	defer func() {
-		go trakt.CalendarShows("my/shows/new", nextPage(pageParam))
-	}()
 
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -1042,10 +990,6 @@ func TraktMyPremieres(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("my/shows/premieres", pageParam)
 
-	defer func() {
-		go trakt.CalendarShows("my/shows/premieres", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -1061,10 +1005,6 @@ func TraktMyMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.CalendarMovies("my/movies", pageParam)
-
-	defer func() {
-		go trakt.CalendarMovies("my/movies", nextPage(pageParam))
-	}()
 
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -1082,10 +1022,6 @@ func TraktMyReleases(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.CalendarMovies("my/dvd", pageParam)
 
-	defer func() {
-		go trakt.CalendarMovies("my/dvd", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -1101,10 +1037,6 @@ func TraktAllShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("all/shows", pageParam)
-
-	defer func() {
-		go trakt.CalendarShows("all/shows", nextPage(pageParam))
-	}()
 
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -1122,10 +1054,6 @@ func TraktAllNewShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("all/shows/new", pageParam)
 
-	defer func() {
-		go trakt.CalendarShows("all/shows/new", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -1141,10 +1069,6 @@ func TraktAllPremieres(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("all/shows/premieres", pageParam)
-
-	defer func() {
-		go trakt.CalendarShows("all/shows/premieres", nextPage(pageParam))
-	}()
 
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -1162,10 +1086,6 @@ func TraktAllMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.CalendarMovies("all/movies", pageParam)
 
-	defer func() {
-		go trakt.CalendarMovies("all/movies", nextPage(pageParam))
-	}()
-
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -1181,10 +1101,6 @@ func TraktAllReleases(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.CalendarMovies("all/dvd", pageParam)
-
-	defer func() {
-		go trakt.CalendarMovies("all/dvd", nextPage(pageParam))
-	}()
 
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
@@ -1702,7 +1618,7 @@ func SelectTraktUserList(ctx *gin.Context) {
 		items = append(items, l.Name)
 	}
 	choice := xbmcHost.ListDialog("LOCALIZE[30438]", items...)
-	if choice >= 0 {
+	if choice >= 0 && choice < len(lists) {
 		xbmcHost.SetSetting(fmt.Sprintf("trakt_sync_%s_%s_location", action, media), "2")
 		xbmcHost.SetSetting(fmt.Sprintf("trakt_sync_%s_%s_list_name", action, media), lists[choice].Name)
 		xbmcHost.SetSetting(fmt.Sprintf("trakt_sync_%s_%s_list", action, media), strconv.Itoa(lists[choice].IDs.Trakt))

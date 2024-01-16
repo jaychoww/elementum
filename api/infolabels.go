@@ -179,20 +179,22 @@ func GetEpisodeLabels(showID, seasonNumber, episodeNumber int) (item *xbmc.ListI
 	item = episode.ToListItem(show, season)
 	if ls, err := uid.GetShowByTMDB(show.ID); ls != nil && err == nil {
 		log.Debugf("Found show in library: %s", litter.Sdump(ls.UIDs))
-		if le := ls.GetEpisode(episode.SeasonNumber, episodeNumber); le != nil {
+		if le := ls.GetEpisode(episode.SeasonNumber, episodeNumber); le != nil && item.Info != nil {
 			item.Info.DBID = le.UIDs.Kodi
 		}
 	}
-	if item.Art.FanArt == "" {
-		fanarts := make([]string, 0)
-		for _, backdrop := range show.Images.Backdrops {
-			fanarts = append(fanarts, tmdb.ImageURL(backdrop.FilePath, "w1280"))
+	if item.Art != nil {
+		if item.Art.FanArt == "" {
+			fanarts := make([]string, 0)
+			for _, backdrop := range show.Images.Backdrops {
+				fanarts = append(fanarts, tmdb.ImageURL(backdrop.FilePath, "w1280"))
+			}
+			if len(fanarts) > 0 {
+				item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
+			}
 		}
-		if len(fanarts) > 0 {
-			item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
-		}
+		item.Art.Poster = tmdb.ImageURL(season.Poster, "w1280")
 	}
-	item.Art.Poster = tmdb.ImageURL(season.Poster, "w1280")
 
 	return
 }
@@ -205,7 +207,7 @@ func GetMovieLabels(tmdbID string) (item *xbmc.ListItem, err error) {
 	}
 
 	item = movie.ToListItem()
-	if lm, err := uid.GetMovieByTMDB(movie.ID); lm != nil && err == nil {
+	if lm, err := uid.GetMovieByTMDB(movie.ID); lm != nil && err == nil && item.Info != nil {
 		log.Debugf("Found movie in library: %s", litter.Sdump(lm))
 		item.Info.DBID = lm.UIDs.Kodi
 	}

@@ -258,6 +258,10 @@ func TopTraktLists(ctx *gin.Context) {
 	items := xbmc.ListItems{}
 	lists, hasNextPage := trakt.TopLists(pageParam)
 	for _, list := range lists {
+		if list == nil || list.List == nil || list.List.User == nil {
+			continue
+		}
+
 		link := URLForXBMC("/movies/trakt/lists/%s/%d", list.List.User.Ids.Slug, list.List.IDs.Trakt)
 		menuItem := []string{"LOCALIZE[30520]", fmt.Sprintf("RunPlugin(%s)", URLQuery(URLForXBMC("/menu/movie/add"), "name", list.List.Name, "link", link))}
 		if MovieMenu.Contains(addAction, &MenuItem{Name: list.List.Name, Link: link}) {
@@ -301,6 +305,10 @@ func MoviesTraktLists(ctx *gin.Context) {
 	})
 
 	for _, list := range lists {
+		if list == nil || list.User == nil {
+			continue
+		}
+
 		link := URLForXBMC("/movies/trakt/lists/%s/%d", list.User.Ids.Slug, list.IDs.Trakt)
 		menuItem := []string{"LOCALIZE[30520]", fmt.Sprintf("RunPlugin(%s)", URLQuery(URLForXBMC("/menu/movie/add"), "name", list.Name, "link", link))}
 		if MovieMenu.Contains(addAction, &MenuItem{Name: list.Name, Link: link}) {
@@ -541,12 +549,15 @@ func movieLinks(xbmcHost *xbmc.XBMCHost, callbackHost string, tmdbID string) []*
 	log.Info("Searching links for:", tmdbID)
 
 	movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
-
+	if movie == nil {
+		return []*bittorrent.TorrentFile{}
+	}
 	log.Infof("Resolved %s to %s", tmdbID, movie.Title)
 
 	searchers := providers.GetMovieSearchers(xbmcHost, callbackHost)
 	if len(searchers) == 0 {
 		xbmcHost.Notify("Elementum", "LOCALIZE[30204]", config.AddonIcon())
+		return []*bittorrent.TorrentFile{}
 	}
 
 	return providers.SearchMovie(xbmcHost, searchers, movie)

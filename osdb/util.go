@@ -47,7 +47,7 @@ func DoSearch(payloads []SearchPayload, preferredLanguage string) (Subtitles, er
 // DoDownload ...
 func DoDownload(file, dl string) (*os.File, string, error) {
 	resp, err := proxy.GetClient().Get(dl)
-	if err != nil {
+	if err != nil || resp == nil {
 		return nil, "", err
 	}
 	defer resp.Body.Close()
@@ -126,7 +126,7 @@ func GetPayloads(xbmcHost *xbmc.XBMCHost, searchString string, languages []strin
 			Query:     searchString,
 			Languages: strings.Join(languages, ","),
 		})
-	} else {
+	} else if labels != nil {
 		// If player ListItem has IMDBNumber specified - we try to get TMDB item from it.
 		// If not - we can use localized show/movie name - which is not always found on OSDB.
 		if strings.HasPrefix(labels["VideoPlayer.IMDBNumber"], "tt") {
