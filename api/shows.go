@@ -389,9 +389,6 @@ func PopularShows(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	shows, total := tmdb.PopularShows(p, config.Get().Language, page)
-	defer func() {
-		go tmdb.PopularShows(p, config.Get().Language, page+1)
-	}()
 	renderShows(ctx, shows, page, total, "", false)
 }
 
@@ -409,9 +406,6 @@ func RecentShows(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	shows, total := tmdb.RecentShows(p, config.Get().Language, page)
-	defer func() {
-		go tmdb.RecentShows(p, config.Get().Language, page+1)
-	}()
 	renderShows(ctx, shows, page, total, "", false)
 }
 
@@ -429,9 +423,6 @@ func RecentEpisodes(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	shows, total := tmdb.RecentEpisodes(p, config.Get().Language, page)
-	defer func() {
-		go tmdb.RecentEpisodes(p, config.Get().Language, page+1)
-	}()
 	renderShows(ctx, shows, page, total, "", false)
 }
 
@@ -441,9 +432,6 @@ func TopRatedShows(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	shows, total := tmdb.TopRatedShows("", config.Get().Language, page)
-	defer func() {
-		go tmdb.TopRatedShows("", config.Get().Language, page+1)
-	}()
 	renderShows(ctx, shows, page, total, "", false)
 }
 
@@ -453,9 +441,6 @@ func TVMostVoted(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	shows, total := tmdb.MostVotedShows("", config.Get().Language, page)
-	defer func() {
-		go tmdb.MostVotedShows("", config.Get().Language, page+1)
-	}()
 	renderShows(ctx, shows, page, total, "", false)
 }
 
@@ -477,9 +462,6 @@ func SearchShows(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	shows, total := tmdb.SearchShows(query, config.Get().Language, page)
-	defer func() {
-		go tmdb.SearchShows(query, config.Get().Language, page+1)
-	}()
 	renderShows(ctx, shows, page, total, query, false)
 }
 

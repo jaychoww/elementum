@@ -5143,9 +5143,9 @@ func (z SeasonList) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *Show) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 23
+	// map header, size 24
 	// string "Entity"
-	o = append(o, 0xde, 0x0, 0x17, 0xa6, 0x45, 0x6e, 0x74, 0x69, 0x74, 0x79)
+	o = append(o, 0xde, 0x0, 0x18, 0xa6, 0x45, 0x6e, 0x74, 0x69, 0x74, 0x79)
 	o, err = z.Entity.MarshalMsg(o)
 	if err != nil {
 		err = msgp.WrapError(err, "Entity")
@@ -5260,6 +5260,17 @@ func (z *Show) MarshalMsg(b []byte) (o []byte, err error) {
 		o, err = z.ExternalIDs.MarshalMsg(o)
 		if err != nil {
 			err = msgp.WrapError(err, "ExternalIDs")
+			return
+		}
+	}
+	// string "LastEpisodeToAir"
+	o = append(o, 0xb0, 0x4c, 0x61, 0x73, 0x74, 0x45, 0x70, 0x69, 0x73, 0x6f, 0x64, 0x65, 0x54, 0x6f, 0x41, 0x69, 0x72)
+	if z.LastEpisodeToAir == nil {
+		o = msgp.AppendNil(o)
+	} else {
+		o, err = z.LastEpisodeToAir.MarshalMsg(o)
+		if err != nil {
+			err = msgp.WrapError(err, "LastEpisodeToAir")
 			return
 		}
 	}
@@ -5644,6 +5655,23 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 					return
 				}
 			}
+		case "LastEpisodeToAir":
+			if msgp.IsNil(bts) {
+				bts, err = msgp.ReadNilBytes(bts)
+				if err != nil {
+					return
+				}
+				z.LastEpisodeToAir = nil
+			} else {
+				if z.LastEpisodeToAir == nil {
+					z.LastEpisodeToAir = new(Episode)
+				}
+				bts, err = z.LastEpisodeToAir.UnmarshalMsg(bts)
+				if err != nil {
+					err = msgp.WrapError(err, "LastEpisodeToAir")
+					return
+				}
+			}
 		case "Translations":
 			if msgp.IsNil(bts) {
 				bts, err = msgp.ReadNilBytes(bts)
@@ -6017,6 +6045,12 @@ func (z *Show) Msgsize() (s int) {
 		s += msgp.NilSize
 	} else {
 		s += z.ExternalIDs.Msgsize()
+	}
+	s += 17
+	if z.LastEpisodeToAir == nil {
+		s += msgp.NilSize
+	} else {
+		s += z.LastEpisodeToAir.Msgsize()
 	}
 	s += 13
 	if z.Translations == nil {

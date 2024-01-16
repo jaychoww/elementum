@@ -465,9 +465,6 @@ func PopularMovies(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	movies, total := tmdb.PopularMovies(p, config.Get().Language, page)
-	defer func() {
-		go tmdb.PopularMovies(p, config.Get().Language, page+1)
-	}()
 	renderMovies(ctx, movies, page, total, "", false)
 }
 
@@ -485,9 +482,6 @@ func RecentMovies(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	movies, total := tmdb.RecentMovies(p, config.Get().Language, page)
-	defer func() {
-		go tmdb.RecentMovies(p, config.Get().Language, page+1)
-	}()
 	renderMovies(ctx, movies, page, total, "", false)
 }
 
@@ -501,9 +495,6 @@ func TopRatedMovies(ctx *gin.Context) {
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	movies, total := tmdb.TopRatedMovies(genre, config.Get().Language, page)
-	defer func() {
-		go tmdb.TopRatedMovies(genre, config.Get().Language, page+1)
-	}()
 	renderMovies(ctx, movies, page, total, "", false)
 }
 
@@ -522,9 +513,6 @@ func MoviesMostVoted(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	movies, total := tmdb.MostVotedMovies("", config.Get().Language, page)
-	defer func() {
-		go tmdb.MostVotedMovies("", config.Get().Language, page+1)
-	}()
 	renderMovies(ctx, movies, page, total, "", false)
 }
 
@@ -546,9 +534,6 @@ func SearchMovies(ctx *gin.Context) {
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	movies, total := tmdb.SearchMovies(query, config.Get().Language, page)
-	defer func() {
-		go tmdb.SearchMovies(query, config.Get().Language, page+1)
-	}()
 	renderMovies(ctx, movies, page, total, query, false)
 }
 
