@@ -588,59 +588,75 @@ func ShowEpisodes(ctx *gin.Context) {
 	}
 
 	episodes := make(xbmc.ListItems, 0)
+	episodesCollection := make([][]*xbmc.ListItem, len(seasonsToShow))
+	wg := sync.WaitGroup{}
+	wg.Add(len(seasonsToShow))
+
+	index := -1
 	for _, seasonNumber := range seasonsToShow {
-		season := tmdb.GetSeason(showID, seasonNumber, language, len(show.Seasons), true)
-		if season == nil {
-			ctx.Error(errors.New("Unable to find season"))
-			return
-		}
+		index++
 
-		items := season.Episodes.ToListItems(show, season)
+		go func(idx int, seasonNumber int) {
+			defer wg.Done()
 
-		for _, item := range items {
-			if item == nil || item.Info == nil {
-				continue
+			season := tmdb.GetSeason(showID, seasonNumber, language, len(show.Seasons), true)
+			if season == nil {
+				ctx.Error(errors.New("Unable to find season"))
+				return
 			}
 
-			thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
-				show.ID,
-				seasonNumber,
-				item.Info.Episode,
-			) + "%s/%s"
-			contextLabel := playLabel
-			contextTitle := fmt.Sprintf("%s S%02dE%02d", show.OriginalName, seasonNumber, item.Info.Episode)
-			contextURL := contextPlayOppositeURL(thisURL, contextTitle, false)
-			if config.Get().ChooseStreamAutoShow {
-				contextLabel = linksLabel
+			items := season.Episodes.ToListItems(show, season)
+
+			for _, item := range items {
+				if item == nil || item.Info == nil {
+					continue
+				}
+
+				thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
+					show.ID,
+					seasonNumber,
+					item.Info.Episode,
+				) + "%s/%s"
+				contextLabel := playLabel
+				contextTitle := fmt.Sprintf("%s S%02dE%02d", show.OriginalName, seasonNumber, item.Info.Episode)
+				contextURL := contextPlayOppositeURL(thisURL, contextTitle, false)
+				if config.Get().ChooseStreamAutoShow {
+					contextLabel = linksLabel
+				}
+
+				item.Path = contextPlayURL(thisURL, contextTitle, false)
+
+				libraryActions := [][]string{
+					{contextLabel, fmt.Sprintf("PlayMedia(%s)", contextURL)},
+				}
+
+				toggleWatchedAction := []string{"LOCALIZE[30667]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/season/%d/episode/%d/watched", show.ID, seasonNumber, item.Info.Episode))}
+				if item.Info.PlayCount > 0 {
+					toggleWatchedAction = []string{"LOCALIZE[30668]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/season/%d/episode/%d/unwatched", show.ID, seasonNumber, item.Info.Episode))}
+				}
+
+				item.ContextMenu = [][]string{
+					toggleWatchedAction,
+					{"LOCALIZE[30037]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/setviewmode/episodes"))},
+				}
+				item.ContextMenu = append(libraryActions, item.ContextMenu...)
+
+				if config.Get().Platform.Kodi < 17 {
+					item.ContextMenu = append(item.ContextMenu,
+						[]string{"LOCALIZE[30203]", "Action(Info)"},
+						[]string{"LOCALIZE[30268]", "Action(ToggleWatched)"},
+					)
+				}
+				item.IsPlayable = true
 			}
 
-			item.Path = contextPlayURL(thisURL, contextTitle, false)
+			episodesCollection[idx] = items
+		}(index, seasonNumber)
+	}
+	wg.Wait()
 
-			libraryActions := [][]string{
-				{contextLabel, fmt.Sprintf("PlayMedia(%s)", contextURL)},
-			}
-
-			toggleWatchedAction := []string{"LOCALIZE[30667]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/season/%d/episode/%d/watched", show.ID, seasonNumber, item.Info.Episode))}
-			if item.Info.PlayCount > 0 {
-				toggleWatchedAction = []string{"LOCALIZE[30668]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/season/%d/episode/%d/unwatched", show.ID, seasonNumber, item.Info.Episode))}
-			}
-
-			item.ContextMenu = [][]string{
-				toggleWatchedAction,
-				{"LOCALIZE[30037]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/setviewmode/episodes"))},
-			}
-			item.ContextMenu = append(libraryActions, item.ContextMenu...)
-
-			if config.Get().Platform.Kodi < 17 {
-				item.ContextMenu = append(item.ContextMenu,
-					[]string{"LOCALIZE[30203]", "Action(Info)"},
-					[]string{"LOCALIZE[30268]", "Action(ToggleWatched)"},
-				)
-			}
-			item.IsPlayable = true
-		}
-
-		episodes = append(episodes, items...)
+	for _, e := range episodesCollection {
+		episodes = append(episodes, e...)
 	}
 
 	ctx.JSON(200, xbmc.NewView("episodes", filterListItems(episodes)))

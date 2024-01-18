@@ -469,7 +469,7 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 				return
 			}
 
-			item := movieListing.Movie.ToListItem()
+			item := movieListing.Movie.ToListItem(nil)
 
 			// Example of adding UTF8 char into title,
 			// list: https://www.utf8-chartable.de/unicode-utf8-table.pl?start=9728&number=1024&names=2&utf8=string-literal
@@ -1173,20 +1173,19 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 				airDate = airDate[0:strings.Index(airDate, "T")]
 			}
 
-			if !config.Get().ForceUseTrakt && movieListing.Movie.IDs.TMDB != 0 {
+			if movieListing.Movie.IDs.TMDB != 0 {
 				movie = tmdb.GetMovie(movieListing.Movie.IDs.TMDB, language)
-
-				if movie != nil {
-					movieName = movie.Title
-				}
 			}
 
 			tmdbID := strconv.Itoa(movieListing.Movie.IDs.TMDB)
 			var item *xbmc.ListItem
-			if movie != nil {
+			if !config.Get().ForceUseTrakt && movie != nil {
+				if movie.Title != "" {
+					movieName = movie.Title
+				}
 				item = movie.ToListItem()
 			} else {
-				item = movieListing.Movie.ToListItem()
+				item = movieListing.Movie.ToListItem(movie)
 			}
 
 			aired, _ := time.Parse("2006-01-02", airDate)

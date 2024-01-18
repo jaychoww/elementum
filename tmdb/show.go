@@ -923,9 +923,9 @@ func (show *Show) IsSeasonAired(season int) bool {
 		return false
 	}
 
-	// If Last aired episode is from never season - then everything older is considered aired
-	if show.LastEpisodeToAir != nil {
-		return show.LastEpisodeToAir.SeasonNumber > season
+	// If Last aired episode is from newer season - then everything older is considered aired
+	if show.LastEpisodeToAir != nil && show.LastEpisodeToAir.SeasonNumber > season {
+		return true
 	}
 
 	// If next season is aired - then everything older is considered aired
