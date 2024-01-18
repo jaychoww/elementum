@@ -115,18 +115,21 @@ func (r *Request) Do() (err error) {
 				log.Warningf("Rate limit exceeded getting %s with %+v on %s, cooling down...", r.Description, r.Params, r.URL)
 				r.API.RateLimiter.CoolDown(r.ResponseHeader)
 				err = util.ErrExceeded
+				r.Error(err)
 				return err
 			} else if r.ResponseStatusCode == 404 {
-				log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, r.ResponseStatus)
+				log.Errorf("Bad status getting %s with %+v on %s: %d/%s", r.Description, r.Params, r.URL, r.ResponseStatusCode, r.ResponseStatus)
 				err = util.ErrNotFound
+				r.Error(err)
 				return err
 			} else if r.ResponseStatusCode == 403 && r.API.RetriesLeft > 0 {
 				r.API.RetriesLeft--
 				log.Warningf("Not authorized to get %s with %+v on %s, having %d retries left ...", r.Description, r.Params, r.URL, r.API.RetriesLeft)
 				continue
 			} else if r.ResponseStatusCode < 200 || r.ResponseStatusCode >= 300 {
-				log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, r.ResponseStatus)
+				log.Errorf("Bad status getting %s with %+v on %s: %d/%s", r.Description, r.Params, r.URL, r.ResponseStatusCode, r.ResponseStatus)
 				err = util.ErrHTTP
+				r.Error(err)
 				return err
 			}
 
@@ -139,7 +142,7 @@ func (r *Request) Do() (err error) {
 
 	r.Stage("Response")
 
-	if resp != nil && resp.ResponseBody != nil {
+	if resp != nil && resp.ResponseBody != nil && r.ResponseError == nil {
 		r.Size(uint64(resp.ResponseBody.Len()))
 		if r.Result != nil {
 			err = json.Unmarshal(resp.ResponseBody.Bytes(), r.Result)
