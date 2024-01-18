@@ -12,7 +12,6 @@ import (
 	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
-	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/util/ident"
 	"github.com/elgatito/elementum/util/reqapi"
 	"github.com/elgatito/elementum/xbmc"
@@ -42,13 +41,6 @@ var (
 	UserAgent = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.21 Safari/537.36"
 )
 
-var (
-	retriesLeft             = 3
-	burstRate               = 50
-	burstTime               = 10 * time.Second
-	simultaneousConnections = 25
-)
-
 const (
 	// ProgressSortWatched ...
 	ProgressSortWatched = iota
@@ -64,8 +56,6 @@ var (
 	// ErrLocked reflects Trakt account locked status
 	ErrLocked = errors.New("Account is locked")
 )
-
-var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
 
 // Object ...
 type Object struct {
@@ -552,20 +542,6 @@ type HistoryResponse struct {
 		} `json:"episodes"`
 		Ids []int `json:"ids"`
 	} `json:"not_found"`
-}
-
-func totalFromHeaders(headers http.Header) (total int, err error) {
-	if len(headers) > 0 {
-		if itemCount, exists := headers["X-Pagination-Item-Count"]; exists {
-			if itemCount != nil {
-				total, err = strconv.Atoi(itemCount[0])
-				return
-			}
-			return -1, errors.New("X-Pagination-Item-Count was empty")
-		}
-		return -1, errors.New("No X-Pagination-Item-Count header found")
-	}
-	return -1, errors.New("No valid headers in request")
 }
 
 func getPagination(headers http.Header) *Pagination {

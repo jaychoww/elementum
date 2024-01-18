@@ -23,7 +23,7 @@ import (
 )
 
 // Fill fanart from TMDB
-func setShowFanart(show *Show) *Show {
+func setShowFanart(show *Show, tmdbShow *tmdb.Show) *Show {
 	if show.Images == nil {
 		show.Images = &Images{}
 	}
@@ -47,8 +47,10 @@ func setShowFanart(show *Show) *Show {
 		return show
 	}
 
-	tmdbID := strconv.Itoa(show.IDs.TMDB)
-	tmdbShow := tmdb.GetShowByID(tmdbID, config.Get().Language)
+	if tmdbShow == nil {
+		tmdbID := strconv.Itoa(show.IDs.TMDB)
+		tmdbShow = tmdb.GetShowByID(tmdbID, config.Get().Language)
+	}
 	if tmdbShow == nil || tmdbShow.Images == nil {
 		return show
 	}
@@ -76,49 +78,6 @@ func setShowFanart(show *Show) *Show {
 		show.Images.Banner.Full = backdropImage
 	}
 	return show
-}
-
-func setShowsFanart(shows []*Shows) []*Shows {
-	wg := sync.WaitGroup{}
-	for i, show := range shows {
-		wg.Add(1)
-		go func(idx int, s *Shows) {
-			defer wg.Done()
-			shows[idx].Show = setShowFanart(s.Show)
-		}(i, show)
-	}
-	wg.Wait()
-
-	return shows
-}
-
-func setProgressShowsFanart(shows []*ProgressShow) []*ProgressShow {
-	wg := sync.WaitGroup{}
-	wg.Add(len(shows))
-	for i, show := range shows {
-		go func(idx int, s *ProgressShow) {
-			defer wg.Done()
-			if s != nil && s.Show != nil {
-				shows[idx].Show = setShowFanart(s.Show)
-			}
-		}(i, show)
-	}
-	wg.Wait()
-	return shows
-}
-
-func setCalendarShowsFanart(shows []*CalendarShow) []*CalendarShow {
-	wg := sync.WaitGroup{}
-	for i, show := range shows {
-		wg.Add(1)
-		go func(idx int, s *CalendarShow) {
-			defer wg.Done()
-			shows[idx].Show = setShowFanart(s.Show)
-		}(i, show)
-	}
-	wg.Wait()
-
-	return shows
 }
 
 // GetShow ...
@@ -207,38 +166,6 @@ func GetShowByTVDB(tvdbID string) (show *Show) {
 			return
 		}
 		cacheStore.Set(key, show, cache.TraktShowTVDBExpire)
-	}
-	return
-}
-
-// GetSeasons returns list of seasons for show
-func GetSeasons(showID int, withEpisodes bool) (seasons []*Season) {
-	defer perf.ScopeTimer()()
-
-	params := napping.Params{"extended": "full"}.AsUrlValues()
-	if withEpisodes {
-		params = napping.Params{"extended": "full,episodes"}.AsUrlValues()
-	}
-
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktSeasonsKey, showID)
-	if withEpisodes {
-		key = fmt.Sprintf(cache.TraktSeasonsExtendedKey, showID)
-	}
-	if err := cacheStore.Get(key, &seasons); err != nil {
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("shows/%d/seasons", showID),
-			Header: GetAvailableHeader(),
-			Params: params,
-			Result: &seasons,
-		}
-
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			return
-		}
-		cacheStore.Set(key, seasons, cache.TraktSeasonsExpire)
 	}
 	return
 }
@@ -944,14 +871,15 @@ func ListHiddenShows(section string, isUpdateNeeded bool) (shows []*Shows, err e
 func (show *Show) ToListItem() (item *xbmc.ListItem) {
 	defer perf.ScopeTimer()()
 
-	if !config.Get().ForceUseTrakt && show.IDs.TMDB != 0 {
+	var tmdbShow *tmdb.Show
+	if show.IDs.TMDB != 0 {
 		tmdbID := strconv.Itoa(show.IDs.TMDB)
-		if tmdbShow := tmdb.GetShowByID(tmdbID, config.Get().Language); tmdbShow != nil {
+		if tmdbShow = tmdb.GetShowByID(tmdbID, config.Get().Language); tmdbShow != nil && !config.Get().ForceUseTrakt {
 			item = tmdbShow.ToListItem()
 		}
 	}
 	if item == nil {
-		show = setShowFanart(show)
+		show = setShowFanart(show, tmdbShow)
 
 		if show == nil || show.IDs == nil || show.Images == nil {
 			return
@@ -1001,15 +929,14 @@ func (show *Show) ToListItem() (item *xbmc.ListItem) {
 		item.Info.DBID = ls.UIDs.Kodi
 	}
 
-	if config.Get().ShowUnwatchedEpisodesNumber && config.Get().ForceUseTrakt && item.Properties != nil {
-		item.Properties.TotalSeasons = strconv.Itoa(show.CountRealSeasons())
+	if config.Get().ShowUnwatchedEpisodesNumber && item.Properties != nil && tmdbShow != nil {
+		totalEpisodes := tmdbShow.CountEpisodesNumber()
+		item.Properties.TotalSeasons = strconv.Itoa(tmdbShow.CountRealSeasons())
+		item.Properties.TotalEpisodes = strconv.Itoa(totalEpisodes)
 
-		airedEpisodes := show.countEpisodesNumber()
-		item.Properties.TotalEpisodes = strconv.Itoa(airedEpisodes)
-
-		watchedEpisodes := show.countWatchedEpisodesNumber()
+		watchedEpisodes := tmdbShow.CountWatchedEpisodesNumber()
 		item.Properties.WatchedEpisodes = strconv.Itoa(watchedEpisodes)
-		item.Properties.UnWatchedEpisodes = strconv.Itoa(airedEpisodes - watchedEpisodes)
+		item.Properties.UnWatchedEpisodes = strconv.Itoa(totalEpisodes - watchedEpisodes)
 	}
 
 	if item.Art != nil {
@@ -1030,7 +957,7 @@ func (show *Show) ToListItem() (item *xbmc.ListItem) {
 }
 
 // ToListItem ...
-func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
+func (episode *Episode) ToListItem(show *Show, tmdbShow *tmdb.Show) *xbmc.ListItem {
 	defer perf.ScopeTimer()()
 
 	if show == nil || show.IDs == nil || show.Images == nil || episode == nil || episode.IDs == nil {
@@ -1047,7 +974,7 @@ func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 		runtime = show.Runtime
 	}
 
-	show = setShowFanart(show)
+	show = setShowFanart(show, tmdbShow)
 	item := &xbmc.ListItem{
 		Label:  episodeLabel,
 		Label2: fmt.Sprintf("%f", episode.Rating),
@@ -1113,112 +1040,4 @@ func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 	}
 
 	return item
-}
-
-// countWatchedEpisodesNumber returns number of watched episodes
-func (show *Show) countWatchedEpisodesNumber() (watchedEpisodes int) {
-	c := config.Get()
-
-	if playcount.GetWatchedShowByTrakt(show.IDs.Trakt) {
-		watchedEpisodes = show.AiredEpisodes
-	} else {
-		seasons := GetSeasons(show.IDs.Trakt, true)
-		for _, season := range seasons {
-			if !c.ShowSeasonsSpecials && season.Number <= 0 {
-				continue
-			}
-			if playcount.GetWatchedSeasonByTrakt(show.IDs.Trakt, season.Number) {
-				watchedEpisodes += season.AiredEpisodes
-			} else {
-				for _, episode := range season.Episodes {
-					if episode == nil {
-						continue
-					} else if !c.ShowUnairedEpisodes {
-						if episode.FirstAired == "" {
-							continue
-						}
-						if _, isExpired := util.AirDateWithExpireCheck(episode.FirstAired, time.RFC3339, c.ShowEpisodesOnReleaseDay); isExpired {
-							continue
-						}
-					}
-
-					if playcount.GetWatchedEpisodeByTrakt(show.IDs.Trakt, season.Number, episode.Number) {
-						watchedEpisodes++
-					}
-				}
-			}
-		}
-	}
-	return
-}
-
-// CountRealSeasons counts real seasons, meaning without specials.
-func (show *Show) CountRealSeasons() int {
-	seasons := GetSeasons(show.IDs.Trakt, false)
-	if len(seasons) <= 0 {
-		return 0
-	}
-
-	c := config.Get()
-
-	ret := 0
-	for _, s := range seasons {
-		if s == nil {
-			continue
-		}
-
-		if !c.ShowUnairedSeasons {
-			if _, isExpired := util.AirDateWithExpireCheck(s.FirstAired, time.RFC3339, c.ShowEpisodesOnReleaseDay); isExpired {
-				continue
-			}
-		}
-		if !c.ShowSeasonsSpecials && s.Number <= 0 {
-			continue
-		}
-
-		ret++
-	}
-	return ret
-}
-
-// countEpisodesNumber returns number of episodes taking into account unaired and special
-func (show *Show) countEpisodesNumber() (episodes int) {
-	seasons := GetSeasons(show.IDs.Trakt, true)
-	for _, season := range seasons {
-		if season == nil {
-			continue
-		}
-		episodes += season.countEpisodesNumber()
-	}
-
-	return
-}
-
-// countEpisodesNumber returns number of episodes
-func (season *Season) countEpisodesNumber() (episodes int) {
-	if season.Episodes == nil {
-		return season.EpisodeCount
-	}
-
-	c := config.Get()
-
-	if !c.ShowSeasonsSpecials && season.Number <= 0 {
-		return
-	}
-
-	for _, episode := range season.Episodes {
-		if episode == nil {
-			continue
-		} else if !c.ShowUnairedEpisodes {
-			if episode.FirstAired == "" {
-				continue
-			}
-			if _, isExpired := util.AirDateWithExpireCheck(episode.FirstAired, time.RFC3339, c.ShowEpisodesOnReleaseDay); isExpired {
-				continue
-			}
-		}
-
-		episodes++
-	}
-	return
 }

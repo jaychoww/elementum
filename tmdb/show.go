@@ -551,7 +551,7 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 
 	if config.Get().ShowUnwatchedEpisodesNumber {
 		// Get all seasons information for this show, it is required to get Air dates
-		show.NumberOfEpisodes = show.countEpisodesNumber()
+		show.NumberOfEpisodes = show.CountEpisodesNumber()
 	}
 
 	item := &xbmc.ListItem{
@@ -598,7 +598,7 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 	}
 
 	if config.Get().ShowUnwatchedEpisodesNumber {
-		watchedEpisodes := show.countWatchedEpisodesNumber()
+		watchedEpisodes := show.CountWatchedEpisodesNumber()
 		item.Properties.WatchedEpisodes = strconv.Itoa(watchedEpisodes)
 		item.Properties.UnWatchedEpisodes = strconv.Itoa(show.NumberOfEpisodes - watchedEpisodes)
 	}
@@ -734,8 +734,8 @@ func (show *Show) findTranslation(language string) *Translation {
 	return nil
 }
 
-// countWatchedEpisodesNumber returns number of watched episodes
-func (show *Show) countWatchedEpisodesNumber() (watchedEpisodes int) {
+// CountWatchedEpisodesNumber returns number of watched episodes
+func (show *Show) CountWatchedEpisodesNumber() (watchedEpisodes int) {
 	if playcount.GetWatchedShowByTMDB(show.ID) {
 		watchedEpisodes = show.NumberOfEpisodes
 	} else {
@@ -749,8 +749,8 @@ func (show *Show) countWatchedEpisodesNumber() (watchedEpisodes int) {
 	return
 }
 
-// countEpisodesNumber returns number of episodes taking into account unaired and special
-func (show *Show) countEpisodesNumber() (episodes int) {
+// CountEpisodesNumber returns number of episodes taking into account unaired and special
+func (show *Show) CountEpisodesNumber() (episodes int) {
 	for _, season := range show.Seasons {
 		if season == nil {
 			continue

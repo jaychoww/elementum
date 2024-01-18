@@ -762,63 +762,78 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 		}
 	}
 
-	items := make(xbmc.ListItems, 0, len(shows)+hasNextPage)
+	items := make(xbmc.ListItems, len(shows)+hasNextPage)
 
-	for _, showListing := range shows {
-		if showListing == nil || showListing.Show == nil {
-			continue
-		}
+	wg := sync.WaitGroup{}
+	wg.Add(len(shows))
 
-		item := showListing.Show.ToListItem()
-		if item == nil || item.Info == nil {
-			continue
-		}
+	for i, showListing := range shows {
+		go func(i int, showListing *trakt.Shows) {
+			defer wg.Done()
 
-		tmdbID := strconv.Itoa(showListing.Show.IDs.TMDB)
+			if showListing == nil || showListing.Show == nil {
+				return
+			}
 
-		item.Path = URLForXBMC("/show/%d/seasons", showListing.Show.IDs.TMDB)
+			item := showListing.Show.ToListItem()
+			if item == nil || item.Info == nil {
+				return
+			}
 
-		libraryActions := [][]string{}
-		if uid.IsDuplicateShow(tmdbID) || uid.IsAddedToLibrary(tmdbID, library.ShowType) || library.IsInLibrary(showListing.Show.IDs.TMDB, library.ShowType) {
-			libraryActions = append(libraryActions, []string{"LOCALIZE[30283]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/library/show/add/%d?force=true", showListing.Show.IDs.TMDB))})
-			libraryActions = append(libraryActions, []string{"LOCALIZE[30253]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", showListing.Show.IDs.TMDB))})
-		} else {
-			libraryActions = append(libraryActions, []string{"LOCALIZE[30252]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/library/show/add/%d", showListing.Show.IDs.TMDB))})
-		}
+			tmdbID := strconv.Itoa(showListing.Show.IDs.TMDB)
 
-		toggleWatchedAction := []string{"LOCALIZE[30667]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/watched", showListing.Show.IDs.TMDB))}
-		if item.Info.PlayCount > 0 {
-			toggleWatchedAction = []string{"LOCALIZE[30668]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/unwatched", showListing.Show.IDs.TMDB))}
-		}
+			item.Path = URLForXBMC("/show/%d/seasons", showListing.Show.IDs.TMDB)
 
-		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/watchlist/add", showListing.Show.IDs.TMDB))}
-		if inShowsWatchlist(showListing.Show.IDs.TMDB) {
-			watchlistAction = []string{"LOCALIZE[30256]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/watchlist/remove", showListing.Show.IDs.TMDB))}
-		}
+			libraryActions := [][]string{}
+			if uid.IsDuplicateShow(tmdbID) || uid.IsAddedToLibrary(tmdbID, library.ShowType) || library.IsInLibrary(showListing.Show.IDs.TMDB, library.ShowType) {
+				libraryActions = append(libraryActions, []string{"LOCALIZE[30283]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/library/show/add/%d?force=true", showListing.Show.IDs.TMDB))})
+				libraryActions = append(libraryActions, []string{"LOCALIZE[30253]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", showListing.Show.IDs.TMDB))})
+			} else {
+				libraryActions = append(libraryActions, []string{"LOCALIZE[30252]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/library/show/add/%d", showListing.Show.IDs.TMDB))})
+			}
 
-		collectionAction := []string{"LOCALIZE[30258]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/collection/add", showListing.Show.IDs.TMDB))}
-		if inShowsCollection(showListing.Show.IDs.TMDB) {
-			collectionAction = []string{"LOCALIZE[30259]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/collection/remove", showListing.Show.IDs.TMDB))}
-		}
+			toggleWatchedAction := []string{"LOCALIZE[30667]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/watched", showListing.Show.IDs.TMDB))}
+			if item.Info.PlayCount > 0 {
+				toggleWatchedAction = []string{"LOCALIZE[30668]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/unwatched", showListing.Show.IDs.TMDB))}
+			}
 
-		item.ContextMenu = [][]string{
-			{"LOCALIZE[30619];;LOCALIZE[30215]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/"))},
-			toggleWatchedAction,
-			watchlistAction,
-			collectionAction,
-			{"LOCALIZE[30035]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/setviewmode/tvshows"))},
-		}
-		item.ContextMenu = append(libraryActions, item.ContextMenu...)
+			watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/watchlist/add", showListing.Show.IDs.TMDB))}
+			if inShowsWatchlist(showListing.Show.IDs.TMDB) {
+				watchlistAction = []string{"LOCALIZE[30256]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/watchlist/remove", showListing.Show.IDs.TMDB))}
+			}
 
-		if config.Get().Platform.Kodi < 17 {
-			item.ContextMenu = append(item.ContextMenu,
-				[]string{"LOCALIZE[30203]", "Action(Info)"},
-				[]string{"LOCALIZE[30268]", "Action(ToggleWatched)"},
-			)
-		}
+			collectionAction := []string{"LOCALIZE[30258]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/collection/add", showListing.Show.IDs.TMDB))}
+			if inShowsCollection(showListing.Show.IDs.TMDB) {
+				collectionAction = []string{"LOCALIZE[30259]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/show/%d/collection/remove", showListing.Show.IDs.TMDB))}
+			}
 
-		items = append(items, item)
+			item.ContextMenu = [][]string{
+				{"LOCALIZE[30619];;LOCALIZE[30215]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/"))},
+				toggleWatchedAction,
+				watchlistAction,
+				collectionAction,
+				{"LOCALIZE[30035]", fmt.Sprintf("RunPlugin(%s)", URLForXBMC("/setviewmode/tvshows"))},
+			}
+			item.ContextMenu = append(libraryActions, item.ContextMenu...)
+
+			if config.Get().Platform.Kodi < 17 {
+				item.ContextMenu = append(item.ContextMenu,
+					[]string{"LOCALIZE[30203]", "Action(Info)"},
+					[]string{"LOCALIZE[30268]", "Action(ToggleWatched)"},
+				)
+			}
+
+			items[i] = item
+		}(i, showListing)
 	}
+	wg.Wait()
+
+	for i := len(items) - 1; i >= 0; i-- {
+		if items[i] == nil {
+			items = append(items[:i], items[i+1:]...)
+		}
+	}
+
 	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
 		nextpage := &xbmc.ListItem{
@@ -1361,7 +1376,7 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 			if show != nil && season != nil && episode != nil {
 				item = episode.ToListItem(show, season)
 			} else {
-				item = epi.ToListItem(showListing.Show)
+				item = epi.ToListItem(showListing.Show, show)
 			}
 
 			item.Info.Aired = airDate
@@ -1521,7 +1536,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 			if show != nil && season != nil && episode != nil {
 				item = episode.ToListItem(show, season)
 			} else {
-				item = epi.ToListItem(showListing.Show)
+				item = epi.ToListItem(showListing.Show, show)
 			}
 
 			item.Info.Aired = airDate
