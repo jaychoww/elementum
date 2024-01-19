@@ -42,12 +42,20 @@ type Request struct {
 
 	Result any
 
-	Cache        bool
-	CacheExpire  time.Duration
-	cachePending bool
-	cacheKey     string
+	Cache            bool
+	CacheExpire      time.Duration
+	CacheForceExpire bool
+	cachePending     bool
+	cacheKey         string
 
 	locker util.Unlocker
+}
+
+type CacheEntry struct {
+	Header     http.Header `json:"header"`
+	Body       []byte      `json:"body"`
+	Status     string      `json:"status"`
+	StatusCode int         `json:"statuscode"`
 }
 
 func (r *Request) Prepare() (err error) {
@@ -70,7 +78,7 @@ func (r *Request) Prepare() (err error) {
 
 func (r *Request) requestKey() string {
 	params, _ := url.QueryUnescape(r.Params.Encode())
-	return fmt.Sprintf("%s?%s", r.URL, params)
+	return fmt.Sprintf("%s%s.%s?%s", r.API.Ident, "reqapi", r.URL, params)
 }
 
 func (r *Request) Lock() error {
@@ -86,6 +94,10 @@ func (r *Request) Unlock() error {
 func (r *Request) CacheRead() error {
 	r.cacheKey = r.requestKey()
 
+	if r.CacheForceExpire {
+		return errors.New("cache read forced")
+	}
+
 	cacheStore := cache.NewDBStore()
 	data, err := cacheStore.GetBytes(r.cacheKey)
 	r.Stage("CacheReadBytes")
@@ -93,19 +105,22 @@ func (r *Request) CacheRead() error {
 		return err
 	}
 
-	err = r.Unmarshal(bytes.NewBuffer(data))
-	r.Stage("CacheReadUnmarshal")
-	if err == nil {
-		r.Size(uint64(len(data)))
-		r.ResponseStatusCode = 200
-		r.ResponseStatus = "200 OK"
+	if c, err := r.UnmarshalCache(bytes.NewBuffer(data)); err == nil && c != nil {
+		r.Stage("CacheReadUnmarshalCache")
+		r.ApplyCache(c)
+
+		if err = r.Unmarshal(bytes.NewBuffer(c.Body)); err != nil {
+			r.Stage("CacheReadUnmarshal")
+			return err
+		}
 	}
+	r.Stage("CacheReadUnmarshal")
 
 	return err
 }
 
 func (r *Request) CacheWrite() error {
-	data, err := r.Marshal()
+	data, err := r.MarshalCache()
 	r.Stage("CacheWriteMarshal")
 	if err != nil {
 		return err
@@ -188,11 +203,7 @@ func (r *Request) Do() (err error) {
 		for {
 			resp, err = r.API.GetSession().Send(req)
 
-			if resp != nil {
-				r.ResponseStatusCode = resp.Status()
-				r.ResponseStatus = resp.HttpResponse().Status
-				r.ResponseHeader = resp.HttpResponse().Header
-			}
+			r.ApplyResponse(resp)
 
 			if err != nil {
 				log.Errorf("Failed to make request to %s for %s with %+v: %s", r.URL, r.Description, r.Params, err)
@@ -240,6 +251,15 @@ func (r *Request) Do() (err error) {
 	return
 }
 
+func (r *Request) UnmarshalCache(b *bytes.Buffer) (*CacheEntry, error) {
+	var c *CacheEntry
+	if err := json.Unmarshal(b.Bytes(), &c); err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
 func (r *Request) Unmarshal(b *bytes.Buffer) error {
 	if r.Result != nil {
 		return json.Unmarshal(b.Bytes(), r.Result)
@@ -250,6 +270,16 @@ func (r *Request) Unmarshal(b *bytes.Buffer) error {
 	return nil
 }
 
+func (r *Request) MarshalCache() ([]byte, error) {
+	c := CacheEntry{
+		Status:     r.ResponseStatus,
+		StatusCode: r.ResponseStatusCode,
+		Header:     r.ResponseHeader,
+		Body:       r.ResponseBody.Bytes(),
+	}
+	return json.Marshal(&c)
+}
+
 func (r *Request) Marshal() ([]byte, error) {
 	if r.Result != nil {
 		return json.Marshal(r.Result)
@@ -258,6 +288,29 @@ func (r *Request) Marshal() ([]byte, error) {
 	}
 
 	return nil, errors.New("No data available")
+}
+
+func (r *Request) ApplyResponse(resp *napping.Response) {
+	if resp == nil {
+		return
+	}
+
+	r.ResponseStatusCode = resp.Status()
+	r.ResponseStatus = resp.HttpResponse().Status
+	r.ResponseHeader = resp.HttpResponse().Header
+	r.Size(uint64(resp.ResponseBody.Len()))
+}
+
+func (r *Request) ApplyCache(c *CacheEntry) {
+	if c == nil {
+		return
+	}
+
+	r.ResponseStatusCode = c.StatusCode
+	r.ResponseStatus = c.Status
+	r.ResponseHeader = c.Header
+	r.ResponseBody = bytes.NewBuffer(c.Body)
+	r.Size(uint64(len(c.Body)))
 }
 
 func (r *Request) String() string {
