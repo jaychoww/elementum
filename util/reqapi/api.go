@@ -15,6 +15,10 @@ import (
 )
 
 var (
+	locker = util.NewLocker()
+)
+
+var (
 	TMDBAPI = &API{
 		Ident:       TMDBIdent,
 		Endpoint:    "https://api.themoviedb.org/3",

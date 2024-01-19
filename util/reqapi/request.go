@@ -13,6 +13,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/jmcvetta/napping"
 
+	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/util/trace"
@@ -40,6 +41,13 @@ type Request struct {
 	ResponseSize       uint64
 
 	Result any
+
+	Cache        bool
+	CacheExpire  time.Duration
+	cachePending bool
+	cacheKey     string
+
+	locker util.Unlocker
 }
 
 func (r *Request) Prepare() (err error) {
@@ -60,16 +68,78 @@ func (r *Request) Prepare() (err error) {
 	return nil
 }
 
+func (r *Request) requestKey() string {
+	params, _ := url.QueryUnescape(r.Params.Encode())
+	return fmt.Sprintf("%s?%s", r.URL, params)
+}
+
+func (r *Request) Lock() error {
+	r.locker = locker.Lock(r.requestKey())
+	return nil
+}
+
+func (r *Request) Unlock() error {
+	r.locker.Unlock()
+	return nil
+}
+
+func (r *Request) CacheRead() error {
+	r.cacheKey = r.requestKey()
+
+	cacheStore := cache.NewDBStore()
+	data, err := cacheStore.GetBytes(r.cacheKey)
+	r.Stage("CacheReadBytes")
+	if err != nil {
+		return err
+	}
+
+	err = r.Unmarshal(bytes.NewBuffer(data))
+	r.Stage("CacheReadUnmarshal")
+	if err == nil {
+		r.Size(uint64(len(data)))
+		r.ResponseStatusCode = 200
+		r.ResponseStatus = "200 OK"
+	}
+
+	return err
+}
+
+func (r *Request) CacheWrite() error {
+	data, err := r.Marshal()
+	r.Stage("CacheWriteMarshal")
+	if err != nil {
+		return err
+	}
+	cacheExpire := r.CacheExpire
+	if cacheExpire == 0 {
+		cacheExpire = cache.CacheExpireMedium
+	}
+
+	cacheStore := cache.NewDBStore()
+	err = cacheStore.SetBytes(r.cacheKey, data, cacheExpire)
+	r.Stage("CacheWriteBytes")
+	return err
+}
+
 func (r *Request) Do() (err error) {
 	defer perf.ScopeTimer()()
 
 	r.Create()
-	if config.Args.EnableRequestTracing {
-		defer func() {
+	defer func() {
+		if r.Cache && r.cachePending && err == nil {
+			go func() {
+				err = r.CacheWrite()
+				r.Error(err)
+				r.Stage("CacheWrite")
+				r.Unlock()
+				r.LogStatus()
+			}()
+		} else {
 			r.Error(err)
-			log.Debugf(r.String())
-		}()
-	}
+			r.Unlock()
+			r.LogStatus()
+		}
+	}()
 
 	if r.API == nil {
 		err = errors.New("API not defined")
@@ -79,6 +149,20 @@ func (r *Request) Do() (err error) {
 	// Do internal preparations
 	if err = r.Prepare(); err != nil {
 		return
+	}
+
+	// Lock execution for same requests.
+	// If cache for this request is enabled -
+	// 		it will be unlocked only after cache is written.
+	r.Lock()
+
+	if r.Cache {
+		// Try to read result from cache
+		if err = r.CacheRead(); err == nil {
+			return err
+		}
+		r.Stage("CacheRead")
+		r.cachePending = true
 	}
 
 	req := &napping.Request{
@@ -97,6 +181,7 @@ func (r *Request) Do() (err error) {
 
 	var resp *napping.Response
 
+	// Run request with rate limiter
 	r.API.RateLimiter.Call(func() error {
 		r.Stage("Request")
 
@@ -111,6 +196,7 @@ func (r *Request) Do() (err error) {
 
 			if err != nil {
 				log.Errorf("Failed to make request to %s for %s with %+v: %s", r.URL, r.Description, r.Params, err)
+				return err
 			} else if r.ResponseStatusCode == 429 {
 				log.Warningf("Rate limit exceeded getting %s with %+v on %s, cooling down...", r.Description, r.Params, r.URL)
 				r.API.RateLimiter.CoolDown(r.ResponseHeader)
@@ -144,16 +230,34 @@ func (r *Request) Do() (err error) {
 
 	if resp != nil && resp.ResponseBody != nil && r.ResponseError == nil {
 		r.Size(uint64(resp.ResponseBody.Len()))
-		if r.Result != nil {
-			err = json.Unmarshal(resp.ResponseBody.Bytes(), r.Result)
-			r.Stage("Unmarshal")
-		} else {
-			r.ResponseBody = resp.ResponseBody
-		}
+
+		// Parse response into ResponseBody or unmarshalled Result
+		err = r.Unmarshal(resp.ResponseBody)
+		r.Stage("Unmarshal")
 	}
 
 	r.Complete()
 	return
+}
+
+func (r *Request) Unmarshal(b *bytes.Buffer) error {
+	if r.Result != nil {
+		return json.Unmarshal(b.Bytes(), r.Result)
+	} else {
+		r.ResponseBody = b
+	}
+
+	return nil
+}
+
+func (r *Request) Marshal() ([]byte, error) {
+	if r.Result != nil {
+		return json.Marshal(r.Result)
+	} else if r.ResponseBody != nil {
+		return r.ResponseBody.Bytes(), nil
+	}
+
+	return nil, errors.New("No data available")
 }
 
 func (r *Request) String() string {
@@ -193,5 +297,11 @@ func (r *Request) Size(size uint64) {
 func (r *Request) Error(err error) {
 	if err != nil {
 		r.ResponseError = err
+	}
+}
+
+func (r *Request) LogStatus() {
+	if config.Args.EnableRequestTracing {
+		log.Debugf(r.String())
 	}
 }

@@ -11,18 +11,18 @@ import (
 	"github.com/klauspost/compress/gzip"
 	msgpack "github.com/vmihailenco/msgpack/v4"
 
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/util/trace"
 )
 
 //go:generate msgp -o msgp.go -io=false -tests=false
 
-// DBStore ...
 type DBStore struct {
 	db *database.BoltDatabase
 }
 
-// DBStoreItem ...
 type DBStoreItem struct {
 	Key   string      `json:"key"`
 	Value interface{} `json:"value"`
@@ -56,9 +56,50 @@ func NewDBStore() *DBStore {
 	return dbStore
 }
 
+// SetBytes stores []byte into cache instance
+func (c *DBStore) SetBytes(key string, value []byte, expires time.Duration) (err error) {
+	defer perf.ScopeTimer()()
+
+	if c == nil || c.db == nil || c.db.IsClosed {
+		return errors.New("database is closed")
+	}
+	if config.Args.DisableCache || config.Args.DisableCacheSet {
+		return errors.New("caching is disabled")
+	}
+
+	t := trace.Cache{
+		Action: "SetBytes",
+		Key:    key,
+	}
+
+	t.Create()
+	if config.Args.EnableCacheTracing {
+		defer func() {
+			t.Stage("SetBytes")
+			log.Debugf(t.String())
+		}()
+	}
+
+	t.Size(uint64(len(value)))
+
+	return c.db.SetBytes(database.CommonBucket, key, append([]byte(strconv.FormatInt(time.Now().UTC().Add(expires).Unix(), 10)), value...))
+}
+
 // Set ...
 func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err error) {
 	defer perf.ScopeTimer()()
+
+	if c == nil || c.db == nil || c.db.IsClosed {
+		return errors.New("database is closed")
+	}
+	if config.Args.DisableCache || config.Args.DisableCacheSet {
+		return errors.New("caching is disabled")
+	}
+
+	t := trace.Cache{
+		Action: "Set",
+		Key:    key,
+	}
 
 	item := DBStoreItem{
 		Key:   key,
@@ -72,16 +113,23 @@ func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err
 		}
 	}()
 
-	if c.db.IsClosed {
-		return errors.New("database is closed")
+	t.Create()
+	if config.Args.EnableCacheTracing {
+		defer func() {
+			t.Stage("SetBytes")
+			log.Debugf(t.String())
+		}()
 	}
 
 	b, err := msgpack.Marshal(item)
 	if err != nil {
+		t.Stage("Unmarshal")
 		return err
 	}
+	t.Stage("Unmarshal")
+	t.Size(uint64(len(b)))
 
-	return c.db.SetBytes(database.CommonBucket, key, append([]byte(strconv.FormatInt(time.Now().UTC().Add(expires).Unix(), 10)), b...))
+	return c.SetBytes(key, b, expires)
 }
 
 // Add ...
@@ -96,17 +144,24 @@ func (c *DBStore) Replace(key string, value interface{}, expires time.Duration) 
 
 // Get ...
 func (c *DBStore) Get(key string, value interface{}) (err error) {
-	if c.db.IsClosed {
-		return errors.New("database is closed")
-	}
-
 	defer perf.ScopeTimer()()
 
-	data, errGet := c.db.GetBytes(database.CommonBucket, key)
-	if errGet != nil {
-		return errGet
-	} else if len(data) == 0 {
-		return errors.New("data is empty")
+	t := trace.Cache{
+		Action: "Get",
+		Key:    key,
+	}
+	t.Create()
+	if config.Args.EnableCacheTracing {
+		defer func() {
+			log.Debugf(t.String())
+		}()
+	}
+
+	data, err := c.GetBytes(key)
+	t.Stage("GetBytes")
+	t.Size(uint64(len(data)))
+	if err != nil {
+		return err
 	}
 
 	// Recover from unmarshal errors
@@ -116,27 +171,64 @@ func (c *DBStore) Get(key string, value interface{}) (err error) {
 		}
 	}()
 
-	if err != nil {
-		return err
-	}
-
 	item := DBStoreItem{
 		Value: value,
 	}
-	if expires, _ := database.ParseCacheItem(data); expires > 0 && expires < util.NowInt64() {
-		go c.db.Delete(database.CommonBucket, key)
-		return errors.New("key is expired")
-	}
 
-	if c.db.IsClosed {
-		return errors.New("database is closed")
-	}
-
-	if errDecode := msgpack.Unmarshal(data[10:], &item); errDecode != nil {
+	if errDecode := msgpack.Unmarshal(data, &item); errDecode != nil {
+		t.Stage("Unmarshal")
 		return errDecode
 	}
+	t.Stage("Unmarshal")
 
 	return nil
+}
+
+// GetBytes gets []byte from cache instance
+func (c *DBStore) GetBytes(key string) (ret []byte, err error) {
+	if c == nil || c.db == nil || c.db.IsClosed {
+		return nil, errors.New("database is closed")
+	}
+	if config.Args.DisableCache || config.Args.DisableCacheGet {
+		return nil, errors.New("caching is disabled")
+	}
+
+	defer perf.ScopeTimer()()
+	t := trace.Cache{
+		Action: "GetBytes",
+		Key:    key,
+	}
+	t.Create()
+	if config.Args.EnableCacheTracing {
+		defer func() {
+			log.Debugf(t.String())
+		}()
+	}
+
+	data, err := c.db.GetBytes(database.CommonBucket, key)
+	t.Stage("GetBytes")
+	t.Size(uint64(len(data)))
+	if data != nil {
+		if len(data) == 0 {
+			return nil, errors.New("data is empty")
+		} else if len(data) < 10 {
+			return nil, errors.New("not enough data")
+		}
+	} else if data == nil {
+		return nil, errors.New("no data found")
+	}
+
+	// Check if item is expired
+	if expires, _ := database.ParseCacheItem(data); expires > 0 && expires < util.NowInt64() {
+		t.Stage("Parse")
+		if c != nil && c.db != nil {
+			go c.db.Delete(database.CommonBucket, key)
+		}
+		return nil, errors.New("key is expired")
+	}
+
+	// Return data without date part
+	return data[10:], err
 }
 
 // Delete ...
