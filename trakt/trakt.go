@@ -610,7 +610,8 @@ func GetCode() (code *Code, err error) {
 		Params: napping.Params{
 			"client_id": config.TraktWriteClientID,
 		}.AsUrlValues(),
-		Result: &code,
+		Result:      &code,
+		Description: "oauth device code",
 	}
 
 	err = req.Do()
@@ -642,7 +643,8 @@ func PollToken(code *Code) (token *Token, err error) {
 					"client_id":     config.TraktWriteClientID,
 					"client_secret": config.TraktWriteClientSecret,
 				}.AsUrlValues(),
-				Result: &token,
+				Result:      &token,
+				Description: "oauth device token",
 			}
 
 			req.Do()
@@ -713,7 +715,8 @@ func TokenRefreshHandler() {
 						"redirect_uri":  "urn:ietf:wg:oauth:2.0:oob",
 						"grant_type":    "refresh_token",
 					}.AsUrlValues(),
-					Result: &token,
+					Result:      &token,
+					Description: "oauth token",
 				}
 
 				err := req.Do()
@@ -797,11 +800,12 @@ func Authorize(fromSettings bool) error {
 				// Getting username for currently authorized user
 				user := &UserSettings{}
 				req := reqapi.Request{
-					API:    reqapi.TraktAPI,
-					URL:    "users/settings",
-					Header: GetAuthenticatedHeader(),
-					Params: napping.Params{}.AsUrlValues(),
-					Result: &user,
+					API:         reqapi.TraktAPI,
+					URL:         "users/settings",
+					Header:      GetAuthenticatedHeader(),
+					Params:      napping.Params{}.AsUrlValues(),
+					Result:      &user,
+					Description: "user settings",
 				}
 
 				if err = req.Do(); err != nil {
@@ -945,12 +949,13 @@ func AddToWatchlist(itemType string, tmdbID string) (req *reqapi.Request, err er
 	}
 
 	req = &reqapi.Request{
-		API:     reqapi.TraktAPI,
-		Method:  "POST",
-		URL:     "sync/watchlist",
-		Header:  GetAuthenticatedHeader(),
-		Params:  napping.Params{}.AsUrlValues(),
-		Payload: bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+		API:         reqapi.TraktAPI,
+		Method:      "POST",
+		URL:         "sync/watchlist",
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Payload:     bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+		Description: "add to watchlist",
 	}
 
 	return req, req.Do()
@@ -977,12 +982,13 @@ func AddToUserlist(listID int, itemType string, tmdbID string) (req *reqapi.Requ
 
 	payloadJSON, _ := json.Marshal(payload)
 	req = &reqapi.Request{
-		API:     reqapi.TraktAPI,
-		Method:  "POST",
-		URL:     endPoint,
-		Header:  GetAuthenticatedHeader(),
-		Params:  napping.Params{}.AsUrlValues(),
-		Payload: bytes.NewBuffer(payloadJSON),
+		API:         reqapi.TraktAPI,
+		Method:      "POST",
+		URL:         endPoint,
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Payload:     bytes.NewBuffer(payloadJSON),
+		Description: "add to userlist",
 	}
 
 	return req, req.Do()
@@ -1009,12 +1015,13 @@ func RemoveFromUserlist(listID int, itemType string, tmdbID string) (req *reqapi
 
 	payloadJSON, _ := json.Marshal(payload)
 	req = &reqapi.Request{
-		API:     reqapi.TraktAPI,
-		Method:  "POST",
-		URL:     endPoint,
-		Header:  GetAuthenticatedHeader(),
-		Params:  napping.Params{}.AsUrlValues(),
-		Payload: bytes.NewBuffer(payloadJSON),
+		API:         reqapi.TraktAPI,
+		Method:      "POST",
+		URL:         endPoint,
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Payload:     bytes.NewBuffer(payloadJSON),
+		Description: "remove from userlist",
 	}
 
 	return req, req.Do()
@@ -1027,12 +1034,13 @@ func RemoveFromWatchlist(itemType string, tmdbID string) (req *reqapi.Request, e
 	}
 
 	req = &reqapi.Request{
-		API:     reqapi.TraktAPI,
-		Method:  "POST",
-		URL:     "sync/watchlist/remove",
-		Header:  GetAuthenticatedHeader(),
-		Params:  napping.Params{}.AsUrlValues(),
-		Payload: bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+		API:         reqapi.TraktAPI,
+		Method:      "POST",
+		URL:         "sync/watchlist/remove",
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Payload:     bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+		Description: "remove from watchlist",
 	}
 
 	return req, req.Do()
@@ -1045,12 +1053,13 @@ func AddToCollection(itemType string, tmdbID string) (req *reqapi.Request, err e
 	}
 
 	req = &reqapi.Request{
-		API:     reqapi.TraktAPI,
-		Method:  "POST",
-		URL:     "sync/collection",
-		Header:  GetAuthenticatedHeader(),
-		Params:  napping.Params{}.AsUrlValues(),
-		Payload: bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+		API:         reqapi.TraktAPI,
+		Method:      "POST",
+		URL:         "sync/collection",
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Payload:     bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+		Description: "add to collection",
 	}
 
 	return req, req.Do()
@@ -1063,12 +1072,13 @@ func RemoveFromCollection(itemType string, tmdbID string) (req *reqapi.Request, 
 	}
 
 	req = &reqapi.Request{
-		API:     reqapi.TraktAPI,
-		Method:  "POST",
-		URL:     "sync/collection/remove",
-		Header:  GetAuthenticatedHeader(),
-		Params:  napping.Params{}.AsUrlValues(),
-		Payload: bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+		API:         reqapi.TraktAPI,
+		Method:      "POST",
+		URL:         "sync/collection/remove",
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Payload:     bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)),
+		Description: "remove from collection",
 	}
 
 	return req, req.Do()
@@ -1093,12 +1103,13 @@ func SetWatched(item *WatchedItem) (req *reqapi.Request, err error) {
 	}
 
 	req = &reqapi.Request{
-		API:     reqapi.TraktAPI,
-		Method:  "POST",
-		URL:     endPoint,
-		Header:  GetAuthenticatedHeader(),
-		Params:  napping.Params{}.AsUrlValues(),
-		Payload: bytes.NewBufferString(pre + query + post),
+		API:         reqapi.TraktAPI,
+		Method:      "POST",
+		URL:         endPoint,
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Payload:     bytes.NewBufferString(pre + query + post),
+		Description: "set watched",
 	}
 
 	return req, req.Do()
@@ -1136,13 +1147,14 @@ func SetMultipleWatched(items []*WatchedItem) (*HistoryResponse, error) {
 
 	stats := HistoryResponse{}
 	req := &reqapi.Request{
-		API:     reqapi.TraktAPI,
-		Method:  "POST",
-		URL:     endPoint,
-		Header:  GetAuthenticatedHeader(),
-		Params:  napping.Params{}.AsUrlValues(),
-		Payload: bytes.NewBufferString(pre + query + post),
-		Result:  &stats,
+		API:         reqapi.TraktAPI,
+		Method:      "POST",
+		URL:         endPoint,
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Payload:     bytes.NewBufferString(pre + query + post),
+		Result:      &stats,
+		Description: "set multiple watched",
 	}
 
 	err := req.Do()
@@ -1215,12 +1227,13 @@ func Scrobble(action string, contentType string, tmdbID int, watched float64, ru
 		contentType, tmdbID, progress, ident.GetVersion())
 
 	req := &reqapi.Request{
-		API:     reqapi.TraktAPI,
-		Method:  "POST",
-		URL:     endPoint,
-		Header:  GetAuthenticatedHeader(),
-		Params:  napping.Params{}.AsUrlValues(),
-		Payload: bytes.NewBufferString(payload),
+		API:         reqapi.TraktAPI,
+		Method:      "POST",
+		URL:         endPoint,
+		Header:      GetAuthenticatedHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Payload:     bytes.NewBufferString(payload),
+		Description: "scrobble",
 	}
 
 	if err := req.Do(); err != nil {

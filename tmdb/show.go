@@ -37,25 +37,22 @@ func GetShowImages(showID int) *Images {
 	defer perf.ScopeTimer()()
 
 	var images *Images
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TMDBShowImagesKey, showID)
-	if err := cacheStore.Get(key, &images); err != nil {
-		req := reqapi.Request{
-			API: reqapi.TMDBAPI,
-			URL: fmt.Sprintf("/tv/%d/images", showID),
-			Params: napping.Params{
-				"api_key":                apiKey,
-				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-				"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-			}.AsUrlValues(),
-			Result:      &images,
-			Description: "show images",
-		}
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: fmt.Sprintf("/tv/%d/images", showID),
+		Params: napping.Params{
+			"api_key":                apiKey,
+			"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+		}.AsUrlValues(),
+		Result:      &images,
+		Description: "show images",
 
-		if err = req.Do(); err == nil && images != nil {
-			cacheStore.Set(key, images, cache.TMDBShowImagesExpire)
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
 	}
+
+	req.Do()
 	return images
 }
 
@@ -64,25 +61,22 @@ func GetSeasonImages(showID int, season int) *Images {
 	defer perf.ScopeTimer()()
 
 	var images *Images
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TMDBSeasonImagesKey, showID, season)
-	if err := cacheStore.Get(key, &images); err != nil {
-		req := reqapi.Request{
-			API: reqapi.TMDBAPI,
-			URL: fmt.Sprintf("/tv/%d/season/%d/images", showID, season),
-			Params: napping.Params{
-				"api_key":                apiKey,
-				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-				"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-			}.AsUrlValues(),
-			Result:      &images,
-			Description: "season images",
-		}
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: fmt.Sprintf("/tv/%d/season/%d/images", showID, season),
+		Params: napping.Params{
+			"api_key":                apiKey,
+			"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+		}.AsUrlValues(),
+		Result:      &images,
+		Description: "season images",
 
-		if err = req.Do(); err == nil && images != nil {
-			cacheStore.Set(key, images, cache.TMDBSeasonImagesExpire)
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
 	}
+
+	req.Do()
 	return images
 }
 
@@ -91,25 +85,22 @@ func GetEpisodeImages(showID, season, episode int) *Images {
 	defer perf.ScopeTimer()()
 
 	var images *Images
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TMDBEpisodeImagesKey, showID, season, episode)
-	if err := cacheStore.Get(key, &images); err != nil {
-		req := reqapi.Request{
-			API: reqapi.TMDBAPI,
-			URL: fmt.Sprintf("/tv/%d/season/%d/episode/%d/images", showID, season, episode),
-			Params: napping.Params{
-				"api_key":                apiKey,
-				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-				"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-			}.AsUrlValues(),
-			Result:      &images,
-			Description: "season images",
-		}
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: fmt.Sprintf("/tv/%d/season/%d/episode/%d/images", showID, season, episode),
+		Params: napping.Params{
+			"api_key":                apiKey,
+			"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+		}.AsUrlValues(),
+		Result:      &images,
+		Description: "episode images",
 
-		if err = req.Do(); err == nil && images != nil {
-			cacheStore.Set(key, images, cache.TMDBEpisodeImagesExpire)
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
 	}
+
+	req.Do()
 	return images
 }
 
@@ -127,32 +118,23 @@ func GetShow(showID int, language string) (show *Show) {
 
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TMDBShowByIDKey, showID, language)
-	if err := cacheStore.Get(key, &show); err != nil {
-		req := reqapi.Request{
-			API: reqapi.TMDBAPI,
-			URL: fmt.Sprintf("/tv/%d", showID),
-			Params: napping.Params{
-				"api_key":                apiKey,
-				"append_to_response":     "credits,images,alternative_titles,translations,external_ids,content_ratings",
-				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-				"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-				"language":               language,
-			}.AsUrlValues(),
-			Result:      &show,
-			Description: "show",
-		}
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: fmt.Sprintf("/tv/%d", showID),
+		Params: napping.Params{
+			"api_key":                apiKey,
+			"append_to_response":     "credits,images,alternative_titles,translations,external_ids,content_ratings",
+			"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			"language":               language,
+		}.AsUrlValues(),
+		Result:      &show,
+		Description: "show",
 
-		if err = req.Do(); show == nil && err != nil && err == util.ErrNotFound {
-			cacheStore.Set(key, &show, cache.TMDBShowByIDExpire)
-		}
-		if show == nil {
-			return nil
-		}
-
-		cacheStore.Set(key, &show, cache.TMDBShowByIDExpire)
+		Cache: true,
 	}
+
+	req.Do()
 	if show == nil {
 		return nil
 	}
@@ -218,19 +200,6 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 	params["api_key"] = apiKey
 	totalResults := -1
 
-	genre := params["with_genres"]
-	country := params["region"]
-	language := params["with_original_language"]
-	if params["with_genres"] == "" {
-		genre = "all"
-	}
-	if params["region"] == "" {
-		country = "all"
-	}
-	if params["with_original_language"] == "" {
-		language = "all"
-	}
-
 	requestPerPage := config.Get().ResultsPerPage
 	requestLimitStart := (page - 1) * requestPerPage
 	requestLimitEnd := page*requestPerPage - 1
@@ -240,64 +209,56 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 
 	shows := make(Shows, requestPerPage)
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TMDBShowsTopShowsKey, cacheKey, genre, country, language, requestPerPage, page)
-	totalKey := fmt.Sprintf(cache.TMDBShowsTopShowsTotalKey, cacheKey, genre, country, language)
-	if err := cacheStore.Get(key, &shows); err != nil {
-		wg := sync.WaitGroup{}
-		for p := pageStart; p <= pageEnd; p++ {
-			wg.Add(1)
-			go func(currentPage int) {
-				defer wg.Done()
-				var results *EntityList
-				pageParams := napping.Params{
-					"page": strconv.Itoa(currentPage + 1),
-				}
-				for k, v := range params {
-					pageParams[k] = v
+	wg := sync.WaitGroup{}
+	for p := pageStart; p <= pageEnd; p++ {
+		wg.Add(1)
+		go func(currentPage int) {
+			defer wg.Done()
+			var results *EntityList
+			pageParams := napping.Params{
+				"page": strconv.Itoa(currentPage + 1),
+			}
+			for k, v := range params {
+				pageParams[k] = v
+			}
+
+			req := reqapi.Request{
+				API:         reqapi.TMDBAPI,
+				URL:         fmt.Sprintf("/%s", endpoint),
+				Params:      pageParams.AsUrlValues(),
+				Result:      &results,
+				Description: "list shows",
+
+				Cache: true,
+			}
+
+			if err := req.Do(); err != nil || results == nil {
+				return
+			}
+
+			if totalResults == -1 {
+				totalResults = results.TotalResults
+			}
+
+			var wgItems sync.WaitGroup
+			wgItems.Add(len(results.Results))
+			for s, show := range results.Results {
+				rindex := currentPage*TMDBResultsPerPage - requestLimitStart + s
+				if show == nil || rindex >= len(shows) || rindex < 0 {
+					wgItems.Done()
+					continue
 				}
 
-				req := reqapi.Request{
-					API:         reqapi.TMDBAPI,
-					URL:         fmt.Sprintf("/%s", endpoint),
-					Params:      pageParams.AsUrlValues(),
-					Result:      &results,
-					Description: "list shows",
-				}
-
-				if err = req.Do(); err != nil || results == nil {
-					return
-				}
-
-				if totalResults == -1 {
-					totalResults = results.TotalResults
-					cacheStore.Set(totalKey, totalResults, cache.TMDBShowsTopShowsTotalExpire)
-				}
-
-				var wgItems sync.WaitGroup
-				wgItems.Add(len(results.Results))
-				for s, show := range results.Results {
-					rindex := currentPage*TMDBResultsPerPage - requestLimitStart + s
-					if show == nil || rindex >= len(shows) || rindex < 0 {
-						wgItems.Done()
-						continue
-					}
-
-					go func(rindex int, tmdbId int) {
-						defer wgItems.Done()
-						shows[rindex] = GetShow(tmdbId, params["language"])
-					}(rindex, show.ID)
-				}
-				wgItems.Wait()
-			}(p)
-		}
-		wg.Wait()
-		cacheStore.Set(key, shows, cache.TMDBShowsTopShowsExpire)
-	} else {
-		if err := cacheStore.Get(totalKey, &totalResults); err != nil {
-			totalResults = -1
-		}
+				go func(rindex int, tmdbId int) {
+					defer wgItems.Done()
+					shows[rindex] = GetShow(tmdbId, params["language"])
+				}(rindex, show.ID)
+			}
+			wgItems.Wait()
+		}(p)
 	}
+	wg.Wait()
+
 	return shows, totalResults
 }
 
@@ -313,10 +274,10 @@ func PopularShows(params DiscoverFilters, language string, page int) (Shows, int
 		}
 	} else if params.Country != "" {
 		p = napping.Params{
-			"language":           language,
-			"sort_by":            "popularity.desc",
-			"first_air_date.lte": time.Now().UTC().Format("2006-01-02"),
-			"region":             params.Country,
+			"language":            language,
+			"sort_by":             "popularity.desc",
+			"first_air_date.lte":  time.Now().UTC().Format("2006-01-02"),
+			"with_origin_country": params.Country,
 		}
 	} else if params.Language != "" {
 		p = napping.Params{
@@ -425,49 +386,51 @@ func MostVotedShows(genre string, language string, page int) (Shows, int) {
 // GetTVGenres ...
 func GetTVGenres(language string) []*Genre {
 	genres := GenreList{}
+	var err error
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TMDBShowGenresKey, language)
-	if err := cacheStore.Get(key, &genres); err != nil {
-		req := reqapi.Request{
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: "/genre/tv/list",
+		Params: napping.Params{
+			"api_key":  apiKey,
+			"language": language,
+		}.AsUrlValues(),
+		Result:      &genres,
+		Description: "show genres",
+
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
+
+	// That is a special case, when language in on TMDB, but it results empty names.
+	//   example of this: Catalan language.
+	if err = req.Do(); err == nil && genres.Genres != nil && len(genres.Genres) > 0 && genres.Genres[0].Name == "" {
+		req = reqapi.Request{
 			API: reqapi.TMDBAPI,
 			URL: "/genre/tv/list",
 			Params: napping.Params{
 				"api_key":  apiKey,
-				"language": language,
+				"language": "en-US",
 			}.AsUrlValues(),
 			Result:      &genres,
 			Description: "show genres",
+
+			Cache:       true,
+			CacheExpire: cache.CacheExpireLong,
 		}
 
-		// That is a special case, when language in on TMDB, but it results empty names.
-		//   example of this: Catalan language.
-		if err = req.Do(); err == nil && genres.Genres != nil && len(genres.Genres) > 0 && genres.Genres[0].Name == "" {
-			req = reqapi.Request{
-				API: reqapi.TMDBAPI,
-				URL: "/genre/tv/list",
-				Params: napping.Params{
-					"api_key":  apiKey,
-					"language": "en-US",
-				}.AsUrlValues(),
-				Result:      &genres,
-				Description: "show genres",
-			}
+		err = req.Do()
+	}
 
-			err = req.Do()
+	if err == nil && genres.Genres != nil && len(genres.Genres) > 0 {
+		for _, i := range genres.Genres {
+			i.Name = strings.Title(i.Name)
 		}
 
-		if err == nil && genres.Genres != nil && len(genres.Genres) > 0 {
-			for _, i := range genres.Genres {
-				i.Name = strings.Title(i.Name)
-			}
+		sort.Slice(genres.Genres, func(i, j int) bool {
+			return genres.Genres[i].Name < genres.Genres[j].Name
+		})
 
-			sort.Slice(genres.Genres, func(i, j int) bool {
-				return genres.Genres[i].Name < genres.Genres[j].Name
-			})
-
-			cacheStore.Set(key, genres, cache.TMDBShowGenresExpire)
-		}
 	}
 	return genres.Genres
 }

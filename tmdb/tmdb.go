@@ -224,6 +224,7 @@ type GenreList struct {
 type Country struct {
 	Iso31661    string `json:"iso_3166_1"`
 	Name        string `json:"name"`
+	NativeName  string `json:"native_name"`
 	EnglishName string `json:"english_name"`
 }
 
@@ -333,7 +334,7 @@ type List struct {
 	CreatedBy     string    `json:"created_by"`
 	Description   string    `json:"description"`
 	FavoriteCount int       `json:"favorite_count"`
-	ID            string    `json:"id"`
+	ID            int       `json:"id"`
 	ItemCount     int       `json:"item_count"`
 	Iso639_1      string    `json:"iso_639_1"`
 	Name          string    `json:"name"`
@@ -443,7 +444,8 @@ func tmdbCheck(key string) bool {
 		Params: napping.Params{
 			"api_key": key,
 		}.AsUrlValues(),
-		Result: &result,
+		Result:      &result,
+		Description: "tmdb api key check",
 	}
 
 	if err := req.Do(); err != nil {
@@ -519,24 +521,21 @@ func ImageURL(uri string, size string) string {
 func Find(externalID string, externalSource string) *FindResult {
 	var result *FindResult
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TMDBFindKey, externalSource, externalID)
-	if err := cacheStore.Get(key, &result); err != nil {
-		req := reqapi.Request{
-			API: reqapi.TMDBAPI,
-			URL: fmt.Sprintf("/find/%s", externalID),
-			Params: napping.Params{
-				"api_key":         apiKey,
-				"external_source": externalSource,
-			}.AsUrlValues(),
-			Result:      &result,
-			Description: "find",
-		}
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: fmt.Sprintf("/find/%s", externalID),
+		Params: napping.Params{
+			"api_key":         apiKey,
+			"external_source": externalSource,
+		}.AsUrlValues(),
+		Result:      &result,
+		Description: "find",
 
-		if err = req.Do(); err == nil && result != nil {
-			cacheStore.Set(key, result, cache.TMDBFindExpire)
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
 	}
+
+	req.Do()
 
 	return result
 }
@@ -545,25 +544,30 @@ func Find(externalID string, externalSource string) *FindResult {
 func GetCountries(language string) []*Country {
 	countries := CountryList{}
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TMDBCountriesKey, language)
-	if err := cacheStore.Get(key, &countries); err != nil {
-		req := reqapi.Request{
-			API: reqapi.TMDBAPI,
-			URL: "/configuration/countries",
-			Params: napping.Params{
-				"api_key": apiKey,
-			}.AsUrlValues(),
-			Result:      &countries,
-			Description: "countries",
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: "/configuration/countries",
+		Params: napping.Params{
+			"api_key":  apiKey,
+			"language": language,
+		}.AsUrlValues(),
+		Result:      &countries,
+		Description: "countries",
+
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
+
+	if err := req.Do(); err == nil {
+		for _, c := range countries {
+			if c.NativeName != "" {
+				c.EnglishName = c.NativeName
+			}
 		}
 
-		if err = req.Do(); err == nil {
-			sort.Slice(countries, func(i, j int) bool {
-				return countries[i].EnglishName < countries[j].EnglishName
-			})
-			cacheStore.Set(key, countries, cache.TMDBCountriesExpire)
-		}
+		sort.Slice(countries, func(i, j int) bool {
+			return countries[i].EnglishName < countries[j].EnglishName
+		})
 	}
 	return countries
 }
@@ -571,32 +575,31 @@ func GetCountries(language string) []*Country {
 // GetLanguages ...
 func GetLanguages(language string) []*Language {
 	languages := []*Language{}
-	cacheStore := cache.NewDBStore()
 
-	key := fmt.Sprintf(cache.TMDBLanguagesKey, language)
-	if err := cacheStore.Get(key, &languages); err != nil {
-		req := reqapi.Request{
-			API: reqapi.TMDBAPI,
-			URL: "/configuration/languages",
-			Params: napping.Params{
-				"api_key": apiKey,
-			}.AsUrlValues(),
-			Result:      &languages,
-			Description: "languages",
-		}
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: "/configuration/languages",
+		Params: napping.Params{
+			"api_key":  apiKey,
+			"language": language,
+		}.AsUrlValues(),
+		Result:      &languages,
+		Description: "languages",
 
-		if err = req.Do(); err == nil {
-			for _, l := range languages {
-				if l.Name == "" {
-					l.Name = l.EnglishName
-				}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
+
+	if err := req.Do(); err == nil {
+		for _, l := range languages {
+			if l.Name == "" {
+				l.Name = l.EnglishName
 			}
-
-			sort.Slice(languages, func(i, j int) bool {
-				return languages[i].Name < languages[j].Name
-			})
-			cacheStore.Set(key, languages, cache.TMDBLanguagesExpire)
 		}
+
+		sort.Slice(languages, func(i, j int) bool {
+			return languages[i].Name < languages[j].Name
+		})
 	}
 	return languages
 }

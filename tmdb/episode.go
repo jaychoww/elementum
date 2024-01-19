@@ -24,27 +24,25 @@ func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string
 	defer perf.ScopeTimer()()
 
 	var episode *Episode
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TMDBEpisodeKey, showID, seasonNumber, episodeNumber, language)
-	if err := cacheStore.Get(key, &episode); err != nil {
-		req := reqapi.Request{
-			API: reqapi.TMDBAPI,
-			URL: fmt.Sprintf("/tv/%d/season/%d/episode/%d", showID, seasonNumber, episodeNumber),
-			Params: napping.Params{
-				"api_key":                apiKey,
-				"append_to_response":     "credits,images,videos,alternative_titles,translations,external_ids,trailers",
-				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-				"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-				"language":               language,
-			}.AsUrlValues(),
-			Result:      &episode,
-			Description: "episode",
-		}
 
-		if err = req.Do(); err == nil && episode != nil {
-			cacheStore.Set(key, episode, cache.TMDBEpisodeExpire)
-		}
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: fmt.Sprintf("/tv/%d/season/%d/episode/%d", showID, seasonNumber, episodeNumber),
+		Params: napping.Params{
+			"api_key":                apiKey,
+			"append_to_response":     "credits,images,videos,alternative_titles,translations,external_ids,trailers",
+			"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			"language":               language,
+		}.AsUrlValues(),
+		Result:      &episode,
+		Description: "episode",
+
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
 	}
+
+	req.Do()
 	return episode
 }
 

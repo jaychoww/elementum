@@ -26,75 +26,51 @@ func GetSeason(showID int, seasonNumber int, language string, seasonsCount int, 
 	defer perf.ScopeTimer()()
 
 	var season *Season
-	cacheStore := cache.NewDBStore()
-	updateFrequency := config.Get().UpdateFrequency * 60
-	if updateFrequency == 0 {
-		updateFrequency = 1440
-	} else {
-		updateFrequency = updateFrequency - 1
-	}
-	// Last season should not be saved for too long
-	if seasonNumber == seasonsCount {
-		updateFrequency = 1440
-	}
+	req := reqapi.Request{
+		API: reqapi.TMDBAPI,
+		URL: fmt.Sprintf("/tv/%d/season/%d", showID, seasonNumber),
+		Params: napping.Params{
+			"api_key":                apiKey,
+			"append_to_response":     "credits,images,videos,external_ids,alternative_titles,translations,trailers",
+			"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			"language":               language,
+		}.AsUrlValues(),
+		Result:      &season,
+		Description: "season",
 
-	key := fmt.Sprintf(cache.TMDBSeasonKey, showID, seasonNumber, language, includeEpisodes)
-
-	// If there is already a season with included episodes - we can use it
-	if !includeEpisodes {
-		keyFull := fmt.Sprintf(cache.TMDBSeasonKey, showID, seasonNumber, language, true)
-		if err := cacheStore.Get(keyFull, &season); err == nil && season != nil {
-			return season
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
 	}
 
-	if err := cacheStore.Get(key, &season); err != nil {
-		req := reqapi.Request{
-			API: reqapi.TMDBAPI,
-			URL: fmt.Sprintf("/tv/%d/season/%d", showID, seasonNumber),
-			Params: napping.Params{
-				"api_key":                apiKey,
-				"append_to_response":     "credits,images,videos,external_ids,alternative_titles,translations,trailers",
-				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-				"include_video_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-				"language":               language,
-			}.AsUrlValues(),
-			Result:      &season,
-			Description: "season",
-		}
+	req.Do()
 
-		if err = req.Do(); season == nil && err != nil && err == util.ErrNotFound {
-			cacheStore.Set(key, &season, cache.TMDBSeasonExpire)
-		}
+	if season == nil {
+		return nil
+	}
 
-		if season == nil {
-			return nil
-		}
+	season.EpisodeCount = len(season.Episodes)
 
-		season.EpisodeCount = len(season.Episodes)
-
-		// Fix for shows that have translations but return empty strings
-		// for episode names and overviews.
-		// We detect if episodes have their name filled, and if not re-query
-		// with no language set.
-		// See https://github.com/scakemyer/plugin.video.quasar/issues/249
-		if season.EpisodeCount > 0 && includeEpisodes {
-			// If we have empty Names/Overviews then we need to collect Translations separately
-			wg := sync.WaitGroup{}
-			for i, episode := range season.Episodes {
-				if episode.Translations == nil && (episode.Name == "" || episode.Overview == "") {
-					wg.Add(1)
-					go func(idx int, episode *Episode) {
-						defer wg.Done()
-						season.Episodes[idx] = GetEpisode(showID, seasonNumber, idx+1, language)
-					}(i, episode)
-				}
+	// Fix for shows that have translations but return empty strings
+	// for episode names and overviews.
+	// We detect if episodes have their name filled, and if not re-query
+	// with no language set.
+	// See https://github.com/scakemyer/plugin.video.quasar/issues/249
+	if season.EpisodeCount > 0 && includeEpisodes {
+		// If we have empty Names/Overviews then we need to collect Translations separately
+		wg := sync.WaitGroup{}
+		for i, episode := range season.Episodes {
+			if episode.Translations == nil && (episode.Name == "" || episode.Overview == "") {
+				wg.Add(1)
+				go func(idx int, episode *Episode) {
+					defer wg.Done()
+					season.Episodes[idx] = GetEpisode(showID, seasonNumber, idx+1, language)
+				}(i, episode)
 			}
-			wg.Wait()
 		}
-
-		cacheStore.Set(key, &season, cache.TMDBSeasonExpire)
+		wg.Wait()
 	}
+
 	return season
 }
 

@@ -298,6 +298,7 @@ func (r *Request) ApplyResponse(resp *napping.Response) {
 	r.ResponseStatusCode = resp.Status()
 	r.ResponseStatus = resp.HttpResponse().Status
 	r.ResponseHeader = resp.HttpResponse().Header
+	r.ResponseBody = resp.ResponseBody
 	r.Size(uint64(resp.ResponseBody.Len()))
 }
 

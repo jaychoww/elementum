@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
@@ -84,28 +83,26 @@ func setShowFanart(show *Show, tmdbShow *tmdb.Show) *Show {
 func GetShow(ID string) (show *Show) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktShowKey, ID)
-	if err := cacheStore.Get(key, &show); err != nil {
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("shows/%s", ID),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{
-				"extended": "full,images",
-			}.AsUrlValues(),
-			Result: &show,
-		}
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    fmt.Sprintf("shows/%s", ID),
+		Header: GetAvailableHeader(),
+		Params: napping.Params{
+			"extended": "full,images",
+		}.AsUrlValues(),
+		Result:      &show,
+		Description: "trakt show",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
-				xbmcHost.Notify("Elementum", fmt.Sprintf("Failed getting Trakt show (%s), check your logs.", ID), config.AddonIcon())
-			}
-			return
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
 
-		cacheStore.Set(key, show, cache.TraktShowExpire)
+	if err := req.Do(); err != nil {
+		log.Error(err)
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+			xbmcHost.Notify("Elementum", fmt.Sprintf("Failed getting Trakt show (%s), check your logs.", ID), config.AddonIcon())
+		}
+		return
 	}
 
 	return
@@ -115,30 +112,29 @@ func GetShow(ID string) (show *Show) {
 func GetShowByTMDB(tmdbID string) (show *Show) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktShowTMDBKey, tmdbID)
-	if err := cacheStore.Get(key, &show); err != nil {
-		var results ShowSearchResults
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("search/tmdb/%s?type=show", tmdbID),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{}.AsUrlValues(),
-			Result: &results,
-		}
+	var results ShowSearchResults
+	req := &reqapi.Request{
+		API:         reqapi.TraktAPI,
+		URL:         fmt.Sprintf("search/tmdb/%s?type=show", tmdbID),
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &results,
+		Description: "trakt show by tmdb",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
-				xbmcHost.Notify("Elementum", "Failed getting Trakt show using TMDB ID, check your logs.", config.AddonIcon())
-			}
-			return
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
 
-		if len(results) > 0 && results[0].Show != nil {
-			show = results[0].Show
+	if err := req.Do(); err != nil {
+		log.Error(err)
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+			xbmcHost.Notify("Elementum", "Failed getting Trakt show using TMDB ID, check your logs.", config.AddonIcon())
 		}
-		cacheStore.Set(key, show, cache.TraktShowTMDBExpire)
+		return
+	}
+
+	if len(results) > 0 && results[0].Show != nil {
+		show = results[0].Show
 	}
 	return
 }
@@ -147,25 +143,23 @@ func GetShowByTMDB(tmdbID string) (show *Show) {
 func GetShowByTVDB(tvdbID string) (show *Show) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktShowTVDBKey, tvdbID)
-	if err := cacheStore.Get(key, &show); err != nil {
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("search/tvdb/%s?type=show", tvdbID),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{}.AsUrlValues(),
-			Result: &show,
-		}
+	req := &reqapi.Request{
+		API:         reqapi.TraktAPI,
+		URL:         fmt.Sprintf("search/tvdb/%s?type=show", tvdbID),
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &show,
+		Description: "trakt show by tvdb",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
-				xbmcHost.Notify("Elementum", "Failed getting Trakt show using TVDB ID, check your logs.", config.AddonIcon())
-			}
-			return
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
+
+	if err := req.Do(); err != nil {
+		log.Error(err)
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+			xbmcHost.Notify("Elementum", "Failed getting Trakt show using TVDB ID, check your logs.", config.AddonIcon())
 		}
-		cacheStore.Set(key, show, cache.TraktShowTVDBExpire)
 	}
 	return
 }
@@ -174,22 +168,20 @@ func GetShowByTVDB(tvdbID string) (show *Show) {
 func GetSeasonEpisodes(showID, seasonNumber int) (episodes []*Episode) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktSeasonKey, showID, seasonNumber)
-	if err := cacheStore.Get(key, &episodes); err != nil {
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("shows/%d/seasons/%d", showID, seasonNumber),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{"extended": "episodes,full"}.AsUrlValues(),
-			Result: &episodes,
-		}
+	req := &reqapi.Request{
+		API:         reqapi.TraktAPI,
+		URL:         fmt.Sprintf("shows/%d/seasons/%d", showID, seasonNumber),
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{"extended": "episodes,full"}.AsUrlValues(),
+		Result:      &episodes,
+		Description: "show season episodes",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			return
-		}
-		cacheStore.Set(key, episodes, cache.TraktSeasonExpire)
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
+
+	if err := req.Do(); err != nil {
+		log.Error(err)
 	}
 	return
 }
@@ -198,22 +190,20 @@ func GetSeasonEpisodes(showID, seasonNumber int) (episodes []*Episode) {
 func GetEpisode(showID, seasonNumber, episodeNumber int) (episode *Episode) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktEpisodeKey, showID, seasonNumber, episodeNumber)
-	if err := cacheStore.Get(key, &episode); err != nil {
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("shows/%d/seasons/%d/episodes/%d", showID, seasonNumber, episodeNumber),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{"extended": "full,images"}.AsUrlValues(),
-			Result: &episode,
-		}
+	req := &reqapi.Request{
+		API:         reqapi.TraktAPI,
+		URL:         fmt.Sprintf("shows/%d/seasons/%d/episodes/%d", showID, seasonNumber, episodeNumber),
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{"extended": "full,images"}.AsUrlValues(),
+		Result:      &episode,
+		Description: "trakt episode",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			return
-		}
-		cacheStore.Set(key, episode, cache.TraktEpisodeExpire)
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
+
+	if err := req.Do(); err != nil {
+		log.Error(err)
 	}
 	return
 }
@@ -222,25 +212,23 @@ func GetEpisode(showID, seasonNumber, episodeNumber int) (episode *Episode) {
 func GetEpisodeByID(id string) (episode *Episode) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktEpisodeByIDKey, id)
-	if err := cacheStore.Get(key, &episode); err != nil {
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("search/trakt/%s?type=episode", id),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{}.AsUrlValues(),
-			Result: &episode,
-		}
+	req := &reqapi.Request{
+		API:         reqapi.TraktAPI,
+		URL:         fmt.Sprintf("search/trakt/%s?type=episode", id),
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &episode,
+		Description: "trakt episode by id",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
-				xbmcHost.Notify("Elementum", "Failed getting Trakt episode, check your logs.", config.AddonIcon())
-			}
-			return
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
+
+	if err := req.Do(); err != nil {
+		log.Error(err)
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+			xbmcHost.Notify("Elementum", "Failed getting Trakt episode, check your logs.", config.AddonIcon())
 		}
-		cacheStore.Set(key, episode, cache.TraktEpisodeByIDExpire)
 	}
 	return
 }
@@ -249,30 +237,29 @@ func GetEpisodeByID(id string) (episode *Episode) {
 func GetEpisodeByTMDB(tmdbID string) (episode *Episode) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktEpisodeByTMDBKey, tmdbID)
-	if err := cacheStore.Get(key, &episode); err != nil {
-		var results EpisodeSearchResults
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("search/tmdb/%s?type=episode", tmdbID),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{}.AsUrlValues(),
-			Result: &results,
-		}
+	var results EpisodeSearchResults
+	req := &reqapi.Request{
+		API:         reqapi.TraktAPI,
+		URL:         fmt.Sprintf("search/tmdb/%s?type=episode", tmdbID),
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &results,
+		Description: "trakt episode by tmdb",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
-				xbmcHost.Notify("Elementum", "Failed getting Trakt episode using TMDB ID, check your logs.", config.AddonIcon())
-			}
-			return
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
 
-		if len(results) > 0 && results[0].Episode != nil {
-			episode = results[0].Episode
+	if err := req.Do(); err != nil {
+		log.Error(err)
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+			xbmcHost.Notify("Elementum", "Failed getting Trakt episode using TMDB ID, check your logs.", config.AddonIcon())
 		}
-		cacheStore.Set(key, episode, cache.TraktEpisodeByTMDBExpire)
+		return
+	}
+
+	if len(results) > 0 && results[0].Episode != nil {
+		episode = results[0].Episode
 	}
 	return
 }
@@ -281,25 +268,23 @@ func GetEpisodeByTMDB(tmdbID string) (episode *Episode) {
 func GetEpisodeByTVDB(tvdbID string) (episode *Episode) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktEpisodeByTVDBKey, tvdbID)
-	if err := cacheStore.Get(key, &episode); err != nil {
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("search/tvdb/%s?type=episode", tvdbID),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{}.AsUrlValues(),
-			Result: &episode,
-		}
+	req := &reqapi.Request{
+		API:         reqapi.TraktAPI,
+		URL:         fmt.Sprintf("search/tvdb/%s?type=episode", tvdbID),
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &episode,
+		Description: "trakt episode by tvdb",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
-				xbmcHost.Notify("Elementum", "Failed getting Trakt episode using TVDB ID, check your logs.", config.AddonIcon())
-			}
-			return
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
+
+	if err := req.Do(); err != nil {
+		log.Error(err)
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+			xbmcHost.Notify("Elementum", "Failed getting Trakt episode using TVDB ID, check your logs.", config.AddonIcon())
 		}
-		cacheStore.Set(key, episode, cache.TraktEpisodeByTVDBExpire)
 	}
 	return
 }
@@ -319,7 +304,8 @@ func SearchShows(query string, page string) (shows []*Shows, err error) {
 			"query":    query,
 			"extended": "full,images",
 		}.AsUrlValues(),
-		Result: &shows,
+		Result:      &shows,
+		Description: "search show",
 	}
 
 	if err = req.Do(); err != nil {
@@ -352,52 +338,43 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 	}
 	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktShowsByCategoryKey, topCategory, page, limit)
-	totalKey := fmt.Sprintf(cache.TraktShowsByCategoryTotalKey, topCategory)
-	if err := cacheStore.Get(key, &shows); err != nil || len(shows) == 0 {
-		var showList []*Show
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    endPoint,
-			Header: GetAvailableHeader(),
-			Params: napping.Params{
-				"page":     page,
-				"limit":    strconv.Itoa(limit),
-				"extended": "full,images",
-			}.AsUrlValues(),
-			Result: &shows,
-		}
+	var showList []*Show
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    endPoint,
+		Header: GetAvailableHeader(),
+		Params: napping.Params{
+			"page":     page,
+			"limit":    strconv.Itoa(limit),
+			"extended": "full,images",
+		}.AsUrlValues(),
+		Result:      &shows,
+		Description: "list shows",
 
-		if topCategory == "popular" || topCategory == "recommendations" {
-			req.Result = &showList
-		}
-
-		if err = req.Do(); err != nil {
-			return shows, 0, err
-		}
-
-		if topCategory == "popular" || topCategory == "recommendations" {
-			showListing := make([]*Shows, 0)
-			for _, show := range showList {
-				showItem := Shows{
-					Show: show,
-				}
-				showListing = append(showListing, &showItem)
-			}
-			shows = showListing
-		}
-
-		pagination := getPagination(req.ResponseHeader)
-		total = pagination.ItemCount
-
-		cacheStore.Set(totalKey, total, cache.TraktShowsByCategoryTotalExpire)
-		cacheStore.Set(key, shows, cache.TraktShowsByCategoryExpire)
-	} else {
-		if err := cacheStore.Get(totalKey, &total); err != nil {
-			total = -1
-		}
+		Cache: true,
 	}
+
+	if topCategory == "popular" || topCategory == "recommendations" {
+		req.Result = &showList
+	}
+
+	if err = req.Do(); err != nil {
+		return shows, 0, err
+	}
+
+	if topCategory == "popular" || topCategory == "recommendations" {
+		showListing := make([]*Shows, 0)
+		for _, show := range showList {
+			showItem := Shows{
+				Show: show,
+			}
+			showListing = append(showListing, &showItem)
+		}
+		shows = showListing
+	}
+
+	pagination := getPagination(req.ResponseHeader)
+	total = pagination.ItemCount
 
 	return
 }
@@ -426,7 +403,8 @@ func WatchlistShows(isUpdateNeeded bool) (shows []*Shows, err error) {
 		Params: napping.Params{
 			"extended": "full,images",
 		}.AsUrlValues(),
-		Result: &watchlist,
+		Result:      &watchlist,
+		Description: "watchlist shows",
 	}
 
 	if err = req.Do(); err != nil {
@@ -479,7 +457,8 @@ func CollectionShows(isUpdateNeeded bool) (shows []*Shows, err error) {
 		Params: napping.Params{
 			"extended": "full,images",
 		}.AsUrlValues(),
-		Result: &collection,
+		Result:      &collection,
+		Description: "collection shows",
 	}
 
 	if err = req.Do(); err != nil {
@@ -532,7 +511,8 @@ func ListItemsShows(user string, listID string, isUpdateNeeded bool) (shows []*S
 		Params: napping.Params{
 			"extended": "full,images",
 		}.AsUrlValues(),
-		Result: &list,
+		Result:      &list,
+		Description: "list item shows",
 	}
 
 	if err = req.Do(); err != nil {
@@ -576,40 +556,29 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 	}
 	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
 
-	cacheStore := cache.NewDBStore()
-	endPointKey := strings.Replace(endPoint, "/", ".", -1)
-	key := fmt.Sprintf(cache.TraktShowsCalendarKey, endPointKey, page, limit)
-	totalKey := fmt.Sprintf(cache.TraktShowsCalendarTotalKey, endPointKey)
-	if err := cacheStore.Get(key, &shows); err != nil {
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    "calendars/" + endPoint,
-			Header: GetAvailableHeader(),
-			Params: napping.Params{
-				"page":     page,
-				"limit":    strconv.Itoa(limit),
-				"extended": "full,images",
-			}.AsUrlValues(),
-			Result: &shows,
-		}
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    "calendars/" + endPoint,
+		Header: GetAvailableHeader(),
+		Params: napping.Params{
+			"page":     page,
+			"limit":    strconv.Itoa(limit),
+			"extended": "full,images",
+		}.AsUrlValues(),
+		Result:      &shows,
+		Description: "calendar shows",
 
-		if err = req.Do(); err != nil {
-			return shows, 0, err
-		}
+		Cache: true,
+	}
 
-		pagination := getPagination(req.ResponseHeader)
-		total = pagination.ItemCount
-		if err != nil {
-			total = -1
-		} else {
-			cacheStore.Set(totalKey, total, cache.TraktShowsCalendarTotalExpire)
-		}
+	if err := req.Do(); err != nil {
+		return shows, 0, err
+	}
 
-		cacheStore.Set(key, &shows, cache.TraktShowsCalendarExpire)
-	} else {
-		if err := cacheStore.Get(totalKey, &total); err != nil {
-			total = -1
-		}
+	pagination := getPagination(req.ResponseHeader)
+	total = pagination.ItemCount
+	if err != nil {
+		total = -1
 	}
 
 	return
@@ -732,11 +701,12 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 
 			endPoint := fmt.Sprintf("shows/%d/progress/watched", show.Show.IDs.Trakt)
 			req := &reqapi.Request{
-				API:    reqapi.TraktAPI,
-				URL:    endPoint,
-				Header: GetAvailableHeader(),
-				Params: params,
-				Result: &watchedProgressShow,
+				API:         reqapi.TraktAPI,
+				URL:         endPoint,
+				Header:      GetAvailableHeader(),
+				Params:      params,
+				Result:      &watchedProgressShow,
+				Description: "watched progress shows",
 			}
 
 			if err = req.Do(); err != nil {
@@ -841,11 +811,12 @@ func ListHiddenShows(section string, isUpdateNeeded bool) (shows []*Shows, err e
 
 		var hiddenShows []*HiddenShow
 		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    "users/hidden/" + section,
-			Header: GetAvailableHeader(),
-			Params: params,
-			Result: &hiddenShows,
+			API:         reqapi.TraktAPI,
+			URL:         "users/hidden/" + section,
+			Header:      GetAvailableHeader(),
+			Params:      params,
+			Result:      &hiddenShows,
+			Description: "hidden shows",
 		}
 
 		if err = req.Do(); err != nil {

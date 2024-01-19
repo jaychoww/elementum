@@ -53,10 +53,7 @@ func TVIndex(ctx *gin.Context) {
 		{Label: "TMDB > LOCALIZE[30212]", Path: URLForXBMC("/shows/mostvoted"), Thumbnail: config.AddonResource("img", "most_voted.png")},
 		{Label: "TMDB > LOCALIZE[30289]", Path: URLForXBMC("/shows/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
 		{Label: "TMDB > LOCALIZE[30373]", Path: URLForXBMC("/shows/languages"), Thumbnail: config.AddonResource("img", "genre_tv.png")},
-		// Note: Search by countries is implemented, but TMDB does not support it yet,
-		// so we are not showing this. When there is an endpoint - we can enable
-		// and modify the URL params to /discover endpoint
-		// {Label: "LOCALIZE[30374]", Path: URLForXBMC("/shows/countries"), Thumbnail: config.AddonResource("img", "genre_tv.png")},
+		{Label: "TMDB > LOCALIZE[30374]", Path: URLForXBMC("/shows/countries"), Thumbnail: config.AddonResource("img", "genre_tv.png")},
 
 		{Label: "Trakt > LOCALIZE[30361]", Path: URLForXBMC("/shows/trakt/history"), Thumbnail: config.AddonResource("img", "trakt.png"), TraktAuth: true},
 

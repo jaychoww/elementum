@@ -98,25 +98,19 @@ func GetMovie(tmdbID int) (movie *Movie) {
 
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.FanartMovieByIDKey, tmdbID)
-	if err := cacheStore.Get(key, &movie); err != nil {
-		req := reqapi.Request{
-			API:    reqapi.FanartAPI,
-			URL:    fmt.Sprintf("/movies/%d", tmdbID),
-			Header: GetHeader(),
-			Params: napping.Params{}.AsUrlValues(),
-			Result: &movie,
-		}
+	req := reqapi.Request{
+		API:         reqapi.FanartAPI,
+		URL:         fmt.Sprintf("/movies/%d", tmdbID),
+		Header:      GetHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &movie,
+		Description: "movie fanart",
 
-		if err = req.Do(); err != nil {
-			log.Debugf("Error getting fanart for movie (%d): %#v", tmdbID, err)
-			return
-		}
-
-		cacheStore.Set(key, movie, cache.FanartMovieByIDExpire)
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
 	}
 
+	req.Do()
 	return
 }
 
@@ -128,25 +122,19 @@ func GetShow(tvdbID int) (show *Show) {
 
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.FanartShowByIDKey, tvdbID)
-	if err := cacheStore.Get(key, &show); err != nil {
-		req := reqapi.Request{
-			API:    reqapi.FanartAPI,
-			URL:    fmt.Sprintf("/tv/%d", tvdbID),
-			Header: GetHeader(),
-			Params: napping.Params{}.AsUrlValues(),
-			Result: &show,
-		}
+	req := reqapi.Request{
+		API:         reqapi.FanartAPI,
+		URL:         fmt.Sprintf("/tv/%d", tvdbID),
+		Header:      GetHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &show,
+		Description: "show fanart",
 
-		if err = req.Do(); err != nil {
-			log.Debugf("Error getting fanart for show (%d): %#v", tvdbID, err)
-			return
-		}
-
-		cacheStore.Set(key, show, cache.FanartShowByIDExpire)
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
 	}
 
+	req.Do()
 	return
 }
 

@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
@@ -75,28 +74,26 @@ func setFanart(movie *Movie, tmdbMovie *tmdb.Movie) *Movie {
 func GetMovie(ID string) (movie *Movie) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktMovieKey, ID)
-	if err := cacheStore.Get(key, &movie); err != nil {
-		req := reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("movies/%s", ID),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{
-				"extended": "full,images",
-			}.AsUrlValues(),
-			Result: &movie,
-		}
+	req := reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    fmt.Sprintf("movies/%s", ID),
+		Header: GetAvailableHeader(),
+		Params: napping.Params{
+			"extended": "full,images",
+		}.AsUrlValues(),
+		Result:      &movie,
+		Description: "trakt movie",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
-				xbmcHost.Notify("Elementum", fmt.Sprintf("Failed getting Trakt movie (%s), check your logs.", ID), config.AddonIcon())
-			}
-			return
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
 
-		cacheStore.Set(key, movie, cache.TraktMovieExpire)
+	if err := req.Do(); err != nil {
+		log.Error(err)
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+			xbmcHost.Notify("Elementum", fmt.Sprintf("Failed getting Trakt movie (%s), check your logs.", ID), config.AddonIcon())
+		}
+		return
 	}
 
 	return
@@ -106,30 +103,29 @@ func GetMovie(ID string) (movie *Movie) {
 func GetMovieByTMDB(tmdbID string) (movie *Movie) {
 	defer perf.ScopeTimer()()
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktMovieByTMDBKey, tmdbID)
-	if err := cacheStore.Get(key, &movie); err != nil {
-		var results MovieSearchResults
-		req := reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    fmt.Sprintf("search/tmdb/%s?type=movie", tmdbID),
-			Header: GetAvailableHeader(),
-			Params: napping.Params{}.AsUrlValues(),
-			Result: &results,
-		}
+	var results MovieSearchResults
+	req := reqapi.Request{
+		API:         reqapi.TraktAPI,
+		URL:         fmt.Sprintf("search/tmdb/%s?type=movie", tmdbID),
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &results,
+		Description: "trakt movie by tmdb",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
-				xbmcHost.Notify("Elementum", "Failed getting Trakt movie using TMDB ID, check your logs.", config.AddonIcon())
-			}
-			return
-		}
+		Cache:       true,
+		CacheExpire: cache.CacheExpireLong,
+	}
 
-		if len(results) > 0 && results[0].Movie != nil {
-			movie = results[0].Movie
+	if err := req.Do(); err != nil {
+		log.Error(err)
+		if xbmcHost, _ := xbmc.GetLocalXBMCHost(); xbmcHost != nil {
+			xbmcHost.Notify("Elementum", "Failed getting Trakt movie using TMDB ID, check your logs.", config.AddonIcon())
 		}
-		cacheStore.Set(key, movie, cache.TraktMovieByTMDBExpire)
+		return
+	}
+
+	if len(results) > 0 && results[0].Movie != nil {
+		movie = results[0].Movie
 	}
 	return
 }
@@ -148,7 +144,8 @@ func SearchMovies(query string, page string) (movies []*Movies, err error) {
 			"query":    query,
 			"extended": "full,images",
 		}.AsUrlValues(),
-		Result: &movies,
+		Result:      &movies,
+		Description: "movie search",
 	}
 
 	if err = req.Do(); err != nil {
@@ -185,55 +182,45 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 	}
 	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
 
-	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf(cache.TraktMoviesByCategoryKey, topCategory, page, limit)
-	totalKey := fmt.Sprintf(cache.TraktMoviesByCategoryTotalKey, topCategory)
-	if err := cacheStore.Get(key, &movies); err != nil || len(movies) == 0 {
-		var movieList []*Movie
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    endPoint,
-			Header: GetAvailableHeader(),
-			Params: napping.Params{
-				"page":     page,
-				"limit":    strconv.Itoa(limit),
-				"extended": "full,images",
-			}.AsUrlValues(),
-			Result: &movies,
-		}
+	var movieList []*Movie
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    endPoint,
+		Header: GetAvailableHeader(),
+		Params: napping.Params{
+			"page":     page,
+			"limit":    strconv.Itoa(limit),
+			"extended": "full,images",
+		}.AsUrlValues(),
+		Result:      &movies,
+		Description: "list movies",
 
-		if topCategory == "popular" || topCategory == "recommendations" {
-			req.Result = &movieList
-		}
+		Cache: true,
+	}
 
-		if err = req.Do(); err != nil {
-			return movies, 0, err
-		}
+	if topCategory == "popular" || topCategory == "recommendations" {
+		req.Result = &movieList
+	}
 
-		if topCategory == "popular" || topCategory == "recommendations" {
-			movieListing := make([]*Movies, 0)
-			for _, movie := range movieList {
-				movieItem := Movies{
-					Movie: movie,
-				}
-				movieListing = append(movieListing, &movieItem)
+	if err = req.Do(); err != nil {
+		return movies, 0, err
+	}
+
+	if topCategory == "popular" || topCategory == "recommendations" {
+		movieListing := make([]*Movies, 0)
+		for _, movie := range movieList {
+			movieItem := Movies{
+				Movie: movie,
 			}
-			movies = movieListing
+			movieListing = append(movieListing, &movieItem)
 		}
+		movies = movieListing
+	}
 
-		pagination := getPagination(req.ResponseHeader)
-		total = pagination.ItemCount
-		if err != nil {
-			log.Warning(err)
-		} else {
-			cacheStore.Set(totalKey, total, cache.TraktMoviesByCategoryTotalExpire)
-		}
-
-		cacheStore.Set(key, movies, cache.TraktMoviesByCategoryExpire)
-	} else {
-		if err := cacheStore.Get(totalKey, &total); err != nil {
-			total = -1
-		}
+	pagination := getPagination(req.ResponseHeader)
+	total = pagination.ItemCount
+	if err != nil {
+		log.Warning(err)
 	}
 
 	return
@@ -272,7 +259,8 @@ func WatchlistMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 		Params: napping.Params{
 			"extended": "full,images",
 		}.AsUrlValues(),
-		Result: &watchlist,
+		Result:      &watchlist,
+		Description: "watchlist movies",
 	}
 
 	if err = req.Do(); err != nil {
@@ -325,7 +313,8 @@ func CollectionMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 		Params: napping.Params{
 			"extended": "full,images",
 		}.AsUrlValues(),
-		Result: &collection,
+		Result:      &collection,
+		Description: "collection movies",
 	}
 
 	if err = req.Do(); err != nil {
@@ -359,11 +348,12 @@ func Userlists() (lists []*List) {
 	endPoint := fmt.Sprintf("users/%s/lists", traktUsername)
 
 	req := &reqapi.Request{
-		API:    reqapi.TraktAPI,
-		URL:    endPoint,
-		Header: GetAvailableHeader(),
-		Params: napping.Params{}.AsUrlValues(),
-		Result: &lists,
+		API:         reqapi.TraktAPI,
+		URL:         endPoint,
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &lists,
+		Description: "user list movies",
 	}
 
 	if err := req.Do(); err != nil {
@@ -395,11 +385,12 @@ func Likedlists() (lists []*List) {
 
 	inputLists := []*ListContainer{}
 	req := &reqapi.Request{
-		API:    reqapi.TraktAPI,
-		URL:    "users/likes/lists",
-		Header: GetAvailableHeader(),
-		Params: napping.Params{}.AsUrlValues(),
-		Result: &inputLists,
+		API:         reqapi.TraktAPI,
+		URL:         "users/likes/lists",
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &inputLists,
+		Description: "user list likes",
 	}
 
 	if err := req.Do(); err != nil {
@@ -435,7 +426,8 @@ func TopLists(page string) (lists []*ListContainer, hasNext bool) {
 			"page":  page,
 			"limit": strconv.Itoa(ListsPerPage),
 		}.AsUrlValues(),
-		Result: &lists,
+		Result:      &lists,
+		Description: "popular lists",
 	}
 
 	if err := req.Do(); err != nil {
@@ -480,11 +472,12 @@ func ListItemsMovies(user string, listID string, isUpdateNeeded bool) (movies []
 
 	var list []*ListItem
 	req := &reqapi.Request{
-		API:    reqapi.TraktAPI,
-		URL:    fmt.Sprintf("users/%s/lists/%s/items/movies", user, listID),
-		Header: GetAvailableHeader(),
-		Params: napping.Params{}.AsUrlValues(),
-		Result: &list,
+		API:         reqapi.TraktAPI,
+		URL:         fmt.Sprintf("users/%s/lists/%s/items/movies", user, listID),
+		Header:      GetAvailableHeader(),
+		Params:      napping.Params{}.AsUrlValues(),
+		Result:      &list,
+		Description: "user list movie items",
 	}
 
 	if err = req.Do(); err != nil {
@@ -519,41 +512,30 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 	}
 	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
 
-	cacheStore := cache.NewDBStore()
-	endPointKey := strings.Replace(endPoint, "/", ".", -1)
-	key := fmt.Sprintf(cache.TraktMoviesCalendarKey, endPointKey, page, limit)
-	totalKey := fmt.Sprintf(cache.TraktMoviesCalendarTotalKey, endPointKey)
-	if err := cacheStore.Get(key, &movies); err != nil {
-		req := &reqapi.Request{
-			API:    reqapi.TraktAPI,
-			URL:    "calendars/" + endPoint,
-			Header: GetAuthenticatedHeader(),
-			Params: napping.Params{
-				"page":     page,
-				"limit":    strconv.Itoa(limit),
-				"extended": "full,images",
-			}.AsUrlValues(),
-			Result: &movies,
-		}
+	req := &reqapi.Request{
+		API:    reqapi.TraktAPI,
+		URL:    "calendars/" + endPoint,
+		Header: GetAuthenticatedHeader(),
+		Params: napping.Params{
+			"page":     page,
+			"limit":    strconv.Itoa(limit),
+			"extended": "full,images",
+		}.AsUrlValues(),
+		Result:      &movies,
+		Description: "calendar movies",
 
-		if err = req.Do(); err != nil {
-			log.Error(err)
-			return movies, 0, err
-		}
+		Cache: true,
+	}
 
-		pagination := getPagination(req.ResponseHeader)
-		total = pagination.ItemCount
-		if err != nil {
-			total = -1
-		} else {
-			cacheStore.Set(totalKey, total, cache.TraktMoviesCalendarTotalExpire)
-		}
+	if err = req.Do(); err != nil {
+		log.Error(err)
+		return movies, 0, err
+	}
 
-		cacheStore.Set(key, &movies, cache.TraktMoviesCalendarExpire)
-	} else {
-		if err := cacheStore.Get(totalKey, &total); err != nil {
-			total = -1
-		}
+	pagination := getPagination(req.ResponseHeader)
+	total = pagination.ItemCount
+	if err != nil {
+		total = -1
 	}
 
 	return
