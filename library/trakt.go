@@ -60,6 +60,7 @@ func RefreshTrakt() error {
 
 	cacheStore := cache.NewDBStore()
 	lastActivities, err := trakt.GetLastActivities()
+	previousActivities, _ := trakt.GetPreviousActivities()
 	if err != nil || lastActivities == nil {
 		log.Warningf("Cannot get activities: %s", err)
 		if err == trakt.ErrLocked {
@@ -68,8 +69,6 @@ func RefreshTrakt() error {
 
 		return err
 	}
-	var previousActivities trakt.UserActivities
-	_ = cacheStore.Get(cache.TraktActivitiesKey, &previousActivities)
 
 	// If nothing changed from last check - skip everything
 	isFirstRun := !IsTraktInitialized || isKodiUpdated

@@ -152,7 +152,10 @@ func WatchlistMovies(ctx *gin.Context) {
 
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
-	movies, err := trakt.WatchlistMovies(false)
+	lastActivities, err := trakt.GetLastActivities()
+	previousActivities, _ := trakt.GetPreviousActivities()
+
+	movies, err := trakt.WatchlistMovies(err != nil || lastActivities.Movies.WatchlistedAt.After(previousActivities.Movies.WatchlistedAt))
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -165,7 +168,10 @@ func WatchlistShows(ctx *gin.Context) {
 
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
-	shows, err := trakt.WatchlistShows(false)
+	lastActivities, err := trakt.GetLastActivities()
+	previousActivities, _ := trakt.GetPreviousActivities()
+
+	shows, err := trakt.WatchlistShows(err != nil || lastActivities.Shows.WatchlistedAt.After(previousActivities.Shows.WatchlistedAt))
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -178,7 +184,10 @@ func CollectionMovies(ctx *gin.Context) {
 
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
-	movies, err := trakt.CollectionMovies(false)
+	lastActivities, err := trakt.GetLastActivities()
+	previousActivities, _ := trakt.GetPreviousActivities()
+
+	movies, err := trakt.CollectionMovies(err != nil || lastActivities.Movies.CollectedAt.After(previousActivities.Movies.CollectedAt))
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -191,7 +200,10 @@ func CollectionShows(ctx *gin.Context) {
 
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
-	shows, err := trakt.CollectionShows(false)
+	lastActivities, err := trakt.GetLastActivities()
+	previousActivities, _ := trakt.GetPreviousActivities()
+
+	shows, err := trakt.CollectionShows(err != nil || lastActivities.Episodes.CollectedAt.After(previousActivities.Episodes.CollectedAt))
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -204,11 +216,14 @@ func UserlistMovies(ctx *gin.Context) {
 
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
+	lastActivities, err := trakt.GetLastActivities()
+	previousActivities, _ := trakt.GetPreviousActivities()
+
 	user := ctx.Params.ByName("user")
 	listID := ctx.Params.ByName("listId")
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.ListItemsMovies(user, listID, false)
+	movies, err := trakt.ListItemsMovies(user, listID, err != nil || lastActivities.Lists.UpdatedAt.After(previousActivities.Lists.UpdatedAt))
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -221,11 +236,14 @@ func UserlistShows(ctx *gin.Context) {
 
 	xbmcHost, _ := xbmc.GetXBMCHostWithContext(ctx)
 
+	lastActivities, err := trakt.GetLastActivities()
+	previousActivities, _ := trakt.GetPreviousActivities()
+
 	user := ctx.Params.ByName("user")
 	listID := ctx.Params.ByName("listId")
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.ListItemsShows(user, listID, false)
+	shows, err := trakt.ListItemsShows(user, listID, err != nil || lastActivities.Lists.UpdatedAt.After(previousActivities.Lists.UpdatedAt))
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -684,7 +702,10 @@ func TraktHistoryMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 
-	watchedMovies, err := trakt.WatchedMovies(false)
+	lastActivities, err := trakt.GetLastActivities()
+	previousActivities, _ := trakt.GetPreviousActivities()
+
+	watchedMovies, err := trakt.WatchedMovies(err != nil || lastActivities.Movies.WatchedAt.After(previousActivities.Movies.WatchedAt))
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -708,7 +729,10 @@ func TraktHistoryShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 
-	watchedShows, err := trakt.WatchedShows(false)
+	lastActivities, err := trakt.GetLastActivities()
+	previousActivities, _ := trakt.GetPreviousActivities()
+
+	watchedShows, err := trakt.WatchedShows(err != nil || lastActivities.Episodes.WatchedAt.After(previousActivities.Episodes.WatchedAt))
 	if err != nil {
 		xbmcHost.Notify("Elementum", err.Error(), config.AddonIcon())
 	}

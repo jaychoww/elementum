@@ -267,6 +267,10 @@ func WatchlistMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 		return movies, err
 	}
 
+	sort.Slice(watchlist, func(i, j int) bool {
+		return watchlist[i].ListedAt.After(watchlist[j].ListedAt)
+	})
+
 	movieListing := make([]*Movies, 0)
 	for _, movie := range watchlist {
 		movieItem := Movies{
@@ -320,6 +324,10 @@ func CollectionMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 	if err = req.Do(); err != nil {
 		return movies, err
 	}
+
+	sort.Slice(collection, func(i, j int) bool {
+		return collection[i].CollectedAt.After(collection[j].CollectedAt)
+	})
 
 	movieListing := make([]*Movies, 0)
 	for _, movie := range collection {
@@ -483,6 +491,10 @@ func ListItemsMovies(user string, listID string, isUpdateNeeded bool) (movies []
 	if err = req.Do(); err != nil {
 		return movies, err
 	}
+
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].ListedAt.After(list[j].ListedAt)
+	})
 
 	movieListing := make([]*Movies, 0)
 	for _, movie := range list {

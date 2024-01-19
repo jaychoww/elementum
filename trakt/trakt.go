@@ -196,32 +196,32 @@ type Watchlist struct {
 
 // WatchlistMovie ...
 type WatchlistMovie struct {
-	ListedAt string `json:"listed_at"`
-	Type     string `json:"type"`
-	Movie    *Movie `json:"movie"`
+	ListedAt time.Time `json:"listed_at"`
+	Type     string    `json:"type"`
+	Movie    *Movie    `json:"movie"`
 }
 
 // WatchlistShow ...
 type WatchlistShow struct {
-	ListedAt string `json:"listed_at"`
-	Type     string `json:"type"`
-	Show     *Show  `json:"show"`
+	ListedAt time.Time `json:"listed_at"`
+	Type     string    `json:"type"`
+	Show     *Show     `json:"show"`
 }
 
 // WatchlistSeason ...
 type WatchlistSeason struct {
-	ListedAt string  `json:"listed_at"`
-	Type     string  `json:"type"`
-	Season   *Object `json:"season"`
-	Show     *Object `json:"show"`
+	ListedAt time.Time `json:"listed_at"`
+	Type     string    `json:"type"`
+	Season   *Object   `json:"season"`
+	Show     *Object   `json:"show"`
 }
 
 // WatchlistEpisode ...
 type WatchlistEpisode struct {
-	ListedAt string   `json:"listed_at"`
-	Type     string   `json:"type"`
-	Episode  *Episode `json:"episode"`
-	Show     *Object  `json:"show"`
+	ListedAt time.Time `json:"listed_at"`
+	Type     string    `json:"type"`
+	Episode  *Episode  `json:"episode"`
+	Show     *Object   `json:"show"`
 }
 
 // CollectionMovie ...
@@ -245,15 +245,15 @@ type CollectedSeason struct {
 
 // CollectedEpisode ...
 type CollectedEpisode struct {
-	CollectedAt string `json:"collected_at"`
-	Number      int    `json:"number"`
+	CollectedAt time.Time `json:"collected_at"`
+	Number      int       `json:"number"`
 }
 
 // HiddenShow ...
 type HiddenShow struct {
-	HiddenAt string `json:"hidden_at"`
-	Type     string `json:"type"`
-	Show     *Show  `json:"show"`
+	HiddenAt time.Time `json:"hidden_at"`
+	Type     string    `json:"type"`
+	Show     *Show     `json:"show"`
 }
 
 // Images ...
@@ -324,29 +324,29 @@ type ListContainer struct {
 
 // List ...
 type List struct {
-	Name           string `json:"name"`
-	Description    string `json:"description"`
-	Privacy        string `json:"privacy"`
-	DisplayNumbers bool   `json:"display_numbers"`
-	AllowComments  bool   `json:"allow_comments"`
-	SortBy         string `json:"sort_by"`
-	SortHow        string `json:"sort_how"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
-	ItemCount      int    `json:"item_count"`
-	CommentCount   int    `json:"comment_count"`
-	Likes          int    `json:"likes"`
-	IDs            *IDs   `json:"IDs"`
-	User           *User  `json:"User"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	Privacy        string    `json:"privacy"`
+	DisplayNumbers bool      `json:"display_numbers"`
+	AllowComments  bool      `json:"allow_comments"`
+	SortBy         string    `json:"sort_by"`
+	SortHow        string    `json:"sort_how"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	ItemCount      int       `json:"item_count"`
+	CommentCount   int       `json:"comment_count"`
+	Likes          int       `json:"likes"`
+	IDs            *IDs      `json:"IDs"`
+	User           *User     `json:"User"`
 }
 
 // ListItem ...
 type ListItem struct {
-	Rank     int    `json:"rank"`
-	ListedAt string `json:"listed_at"`
-	Type     string `json:"type"`
-	Movie    *Movie `json:"movie"`
-	Show     *Show  `json:"show"`
+	Rank     int       `json:"rank"`
+	ListedAt time.Time `json:"listed_at"`
+	Type     string    `json:"type"`
+	Movie    *Movie    `json:"movie"`
+	Show     *Show     `json:"show"`
 	// Season    *Season  `json:"season"`
 	// Episode   *Episode `json:"episode"`
 }
@@ -1270,6 +1270,12 @@ func GetLastActivities() (ret *UserActivities, err error) {
 	config.Get().TraktAuthorized = true
 
 	return
+}
+
+func GetPreviousActivities() (ret *UserActivities, err error) {
+	var previousActivities UserActivities
+	err = cache.NewDBStore().Get(cache.TraktActivitiesKey, &previousActivities)
+	return &previousActivities, err
 }
 
 // DiffWatchedShows ...

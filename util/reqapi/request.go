@@ -141,7 +141,8 @@ func (r *Request) Do() (err error) {
 
 	r.Create()
 	defer func() {
-		if r.Cache && r.cachePending && err == nil {
+		// We should also cache 404 requests to avoid making them again, at least for cache period
+		if r.Cache && r.cachePending && (err == nil || err == util.ErrNotFound) {
 			go func() {
 				err = r.CacheWrite()
 				r.Error(err)

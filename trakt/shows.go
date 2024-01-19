@@ -3,6 +3,7 @@ package trakt
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"time"
 
@@ -465,6 +466,10 @@ func CollectionShows(isUpdateNeeded bool) (shows []*Shows, err error) {
 		return shows, err
 	}
 
+	sort.Slice(collection, func(i, j int) bool {
+		return collection[i].CollectedAt.After(collection[j].CollectedAt)
+	})
+
 	showListing := make([]*Shows, 0, len(collection))
 	for _, show := range collection {
 		showItem := Shows{
@@ -656,8 +661,7 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 	_ = cacheStore.Get(cache.TraktActivitiesKey, &previousActivities)
 
 	// If last watched time was changed - we should get fresh Watched shows list
-	isRefresh := !lastActivities.Episodes.WatchedAt.Equal(previousActivities.Episodes.WatchedAt)
-	watchedShows, errWatched := WatchedShows(isRefresh)
+	watchedShows, errWatched := WatchedShows(lastActivities.Episodes.WatchedAt.After(previousActivities.Episodes.WatchedAt))
 	if errWatched != nil {
 		log.Errorf("Error getting the watched shows: %v", errWatched)
 		return nil, errWatched
