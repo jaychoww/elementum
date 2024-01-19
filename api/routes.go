@@ -1,8 +1,10 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/elgatito/elementum/api/repository"
 	"github.com/elgatito/elementum/bittorrent"
@@ -10,11 +12,36 @@ import (
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/util"
 
+	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("api")
+
+// Default log formatter, but with added response size information
+var logFormatter = func(param gin.LogFormatterParams) string {
+	var statusColor, methodColor, resetColor string
+	if param.IsOutputColor() {
+		statusColor = param.StatusCodeColor()
+		methodColor = param.MethodColor()
+		resetColor = param.ResetColor()
+	}
+
+	if param.Latency > time.Minute {
+		param.Latency = param.Latency.Truncate(time.Second)
+	}
+	return fmt.Sprintf("[GIN] %v |%s %3d %s| %13v | %8s | %15s |%s %-7s %s %#v\n%s",
+		param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+		statusColor, param.StatusCode, resetColor,
+		param.Latency,
+		humanize.Bytes(uint64(param.BodySize)),
+		param.ClientIP,
+		methodColor, param.Method, resetColor,
+		param.Path,
+		param.ErrorMessage,
+	)
+}
 
 // CORS allows all external source to request data from Elementum
 func CORS() gin.HandlerFunc {
@@ -49,7 +76,11 @@ func Auth() gin.HandlerFunc {
 func Routes(s *bittorrent.Service, shutdown func(code int)) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(gin.LoggerWithWriter(gin.DefaultWriter, "/torrents/list", "/notification"))
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		Formatter: logFormatter,
+		Output:    gin.DefaultWriter,
+		SkipPaths: []string{"/torrents/list", "/notification"},
+	}))
 	r.Use(CORS())
 	r.Use(Auth())
 
