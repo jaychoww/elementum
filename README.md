@@ -1,4 +1,4 @@
-Elementum daemon [![Build Status](https://travis-ci.org/elgatito/elementum.svg?branch=master)](https://travis-ci.org/elgatito/elementum)
+Elementum daemon [![Build Status](https://gitlab.com/elgatito/elementum/badges/master/pipeline.svg?ignore_skipped=true)](https://gitlab.com/elgatito/elementum)
 ======
 
 Fork of the great [Pulsar daemon](https://github.com/steeve/pulsar) and [Quasar daemon](https://github.com/scakemyer/quasar)
