@@ -2,12 +2,12 @@ image: docker:latest
 services:
   - docker:dind
 variables:
-  DOCKER_DRIVER: overlay
+  DOCKER_DRIVER: overlay2
   GOPATH: $CI_PROJECT_DIR/../gopath
 
 stages:
   - build
-  - push
+  - publish
 
 before_script:
   - docker info
@@ -16,25 +16,14 @@ before_script:
   - apk add git go-tools make lftp
   - go env
 
-.build_template: &build_definition
+.build:
   script:
     - make pull
-    - go get -d ./...
-    - go get -d github.com/elgatito/cross-compiler
-    - go tool vet -unsafeptr=false .
-    - make libs
     - make $PLATFORM
-  except:
-    - tags
-    - master
 
-.push_template: &push_definition
+.publish:
   script:
     - make pull
-    - go get -d ./...
-    - go get -d github.com/elgatito/cross-compiler
-    - go tool vet -unsafeptr=false .
-    - make libs
     - make $PLATFORM
   after_script:
     - |
@@ -49,123 +38,48 @@ before_script:
     - tags
     - master
 
-android-arm:
-  stage: build
-  variables:
-    PLATFORM: android-arm
-  <<: *build_definition
-android-arm-bin:
-  stage: push
-  variables:
-    PLATFORM: android-arm
-  <<: *push_definition
+.parallel-matrix:
+  parallel:
+    matrix:
+      - PLATFORM: 
+        - android-arm
+        - android-arm-shared
+        - android-arm64
+        - android-arm64-shared
+        - android-x64
+        - android-x64-shared
+        - android-x86
+        - android-x86-shared
+        - linux-armv6
+        - linux-armv6-shared
+        - linux-armv7
+        - linux-armv7-shared
+        - linux-armv7_softfp
+        - linux-armv7_softfp-shared
+        - linux-arm64
+        - linux-arm64-shared
+        - linux-x64
+        - linux-x64-shared
+        - linux-x86
+        - linux-x86-shared
+        - windows-x64
+        - windows-x64-shared
+        - windows-x86
+        - windows-x86-shared
+        - darwin-x64
+        - darwin-x64-shared
 
-android-x64:
+build:
   stage: build
-  variables:
-    PLATFORM: android-x64
-  <<: *build_definition
-android-x64-bin:
-  stage: push
-  variables:
-    PLATFORM: android-x64
-  <<: *push_definition
+  extends: 
+    - .parallel-matrix 
+    - .build
+  artifacts:
+    paths:
+      - "build/**"
 
-android-x86:
-  stage: build
-  variables:
-    PLATFORM: android-x86
-  <<: *build_definition
-android-x86-bin:
-  stage: push
-  variables:
-    PLATFORM: android-x86
-  <<: *push_definition
-
-darwin-x64:
-  stage: build
-  variables:
-    PLATFORM: darwin-x64
-  <<: *build_definition
-darwin-x64-bin:
-  stage: push
-  variables:
-    PLATFORM: darwin-x64
-  <<: *push_definition
-
-linux-arm:
-  stage: build
-  variables:
-    PLATFORM: linux-arm
-  <<: *build_definition
-linux-arm-bin:
-  stage: push
-  variables:
-    PLATFORM: linux-arm
-  <<: *push_definition
-
-linux-armv7:
-  stage: build
-  variables:
-    PLATFORM: linux-armv7
-  <<: *build_definition
-android-armv7-bin:
-  stage: push
-  variables:
-    PLATFORM: linux-armv7
-  <<: *push_definition
-
-linux-arm64:
-  stage: build
-  variables:
-    PLATFORM: linux-arm64
-  <<: *build_definition
-linux-arm64-bin:
-  stage: push
-  variables:
-    PLATFORM: linux-arm64
-  <<: *push_definition
-
-linux-x64:
-  stage: build
-  variables:
-    PLATFORM: linux-x64
-  <<: *build_definition
-linux-x64-bin:
-  stage: push
-  variables:
-    PLATFORM: linux-x64
-  <<: *push_definition
-
-linux-x86:
-  stage: build
-  variables:
-    PLATFORM: linux-x86
-  <<: *build_definition
-linux-x86-bin:
-  stage: push
-  variables:
-    PLATFORM: linux-x86
-  <<: *push_definition
-
-windows-x64:
-  stage: build
-  variables:
-    PLATFORM: windows-x64
-  <<: *build_definition
-windows-x64-bin:
-  stage: push
-  variables:
-    PLATFORM: windows-x64
-  <<: *push_definition
-
-windows-x86:
-  stage: build
-  variables:
-    PLATFORM: windows-x86
-  <<: *build_definition
-windows-x86-bin:
-  stage: push
-  variables:
-    PLATFORM: windows-x86
-  <<: *push_definition
+publish:
+  stage: publish
+  extends: 
+    - .parallel-matrix 
+    - .publish
